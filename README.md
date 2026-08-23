@@ -1,6 +1,4 @@
-# wxneur 0.97 beta
-
-Свободный переключатель раскладки клавиатуры для Windows (аналог Punto Switcher / [xneur](https://github.com/linuxbuh/xneur)).
+Свободный переключатель раскладки клавиатуры для Windows (аналог Punto Switcher ).
 
 **Автор:** Tap3ah  
 **Лицензия:** [GNU GPL версии 3 или более поздней](LICENSE)  

@@ -1,11 +1,14 @@
 Свободный переключатель раскладки клавиатуры для Windows (аналог Punto Switcher ) 
 
-**Автор:** Tap3ah  
-**Лицензия:** [GNU GPL версии 3 или более поздней](LICENSE)  
 **Платформа:** Windows 10/11, x64
 
 Программа живёт в системном лотке, следит за набором текста и исправляет слово,
 если оно набрано в неправильной раскладке (QWERTY ↔ ЙЦУКЕН).
+Автопереключение раскладки по словарю и префиксу
+Эвристики xneur и словари FrequencyWords
+Настраиваемые горячие клавиши (клавиша + Ctrl/Alt/Shift)
+Отмена последней конвертации
+Окно параметров на русском
 
 ## Возможности
 
@@ -38,41 +41,3 @@
 |---|---|---|
 | [xneur](https://github.com/linuxbuh/xneur) proto и словарь исключений | GPL-2.0-or-later | эвристика языка |
 | [FrequencyWords](https://github.com/hermitdave/FrequencyWords) (OpenSubtitles 2018) | CC-BY-SA-4.0 | 30 000 EN + 30 000 RU словоформ |
-
-Программа публикуется под **GNU GPL v3+**, чтобы быть совместимой с обоими наборами.
-
-## Сборка
-
-Нужны CMake 3.16+, MSVC (Visual Studio 2022 или новее) и Windows SDK.
-
-```bat
-cmake -S . -B build -G "Visual Studio 18 2026"
-cmake --build build --config Release --target wxneur wxneur_tests
-build\Release\wxneur_tests.exe
-```
-
-Готовый файл: `build\Release\wxneur.exe`. Словари копируются в `build\Release\dict\`.
-
-## Установка из исходников
-
-После Release-сборки соберите инсталлятор NSIS:
-
-```bat
-"%ProgramFiles(x86)%\NSIS\makensis.exe" installer\wxneur.nsi
-```
-
-Установщик появится в `dist\wxneur-0.97-beta-setup.exe`.
-Ставит программу в профиль пользователя, ярлык в меню «Пуск», показывает лицензию.
-
-## Конфигурация
-
-Настройки хранятся в `%APPDATA%\wxneur\config.json`. Редактируйте их через
-**Параметры** в меню значка, а не вручную.
-
-## Лицензия
-
-Copyright (C) 2026 Tap3ah
-
-Это свободное ПО: вы можете распространять и изменять его на условиях
-GNU General Public License версии 3 или (на ваш выбор) любой более поздней
-версии, опубликованной Free Software Foundation. Текст — в файле [LICENSE](LICENSE).

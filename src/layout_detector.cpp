@@ -1,5 +1,7 @@
 #include "layout_detector.h"
 
+#include "word_index.h"
+
 #include <string>
 #include <unordered_set>
 
@@ -288,29 +290,51 @@ template <std::size_t N>
     return set.find(word) != set.end();
 }
 
-[[nodiscard]] const std::unordered_set<std::wstring>& english_words() {
-    static const auto set = make_set(kEnglish);
-    return set;
-}
-
-[[nodiscard]] const std::unordered_set<std::wstring>& english_short() {
-    static const auto set = make_set(kEnglishShort);
-    return set;
-}
-
-[[nodiscard]] const std::unordered_set<std::wstring>& russian_words() {
-    static const auto set = make_set(kRussian);
-    return set;
-}
-
-[[nodiscard]] const std::unordered_set<std::wstring>& russian_short() {
-    static const auto set = make_set(kRussianShort);
-    return set;
-}
-
 std::unordered_set<std::wstring> g_extra_en;
 std::unordered_set<std::wstring> g_extra_ru;
 std::unordered_set<std::wstring> g_exceptions;
+WordIndex g_en_index;
+WordIndex g_ru_index;
+bool g_indexes_ready = false;
+
+void ensure_indexes() {
+    if (g_indexes_ready) {
+        return;
+    }
+    for (const wchar_t* word : kEnglish) {
+        g_en_index.add(word);
+    }
+    for (const wchar_t* word : kEnglishShort) {
+        g_en_index.add(word);
+    }
+    for (const wchar_t* word : kRussian) {
+        g_ru_index.add(word);
+    }
+    for (const wchar_t* word : kRussianShort) {
+        g_ru_index.add(word);
+    }
+    g_en_index.finalize();
+    g_ru_index.finalize();
+    g_indexes_ready = true;
+}
+
+[[nodiscard]] WordIndex& index_for(Translator::Layout layout) {
+    ensure_indexes();
+    return (layout == Translator::Layout::Ru) ? g_ru_index : g_en_index;
+}
+
+[[nodiscard]] const std::unordered_set<std::wstring>& extra_for(Translator::Layout layout) {
+    return (layout == Translator::Layout::Ru) ? g_extra_ru : g_extra_en;
+}
+
+[[nodiscard]] bool extra_has_prefix(const std::unordered_set<std::wstring>& extra, std::wstring_view prefix) {
+    for (const auto& word : extra) {
+        if (word.size() >= prefix.size() && word.compare(0, prefix.size(), prefix.data(), prefix.size()) == 0) {
+            return true;
+        }
+    }
+    return false;
+}
 
 [[nodiscard]] const std::unordered_set<std::wstring>& english_proto() {
     static const auto set = make_set(kEnglishProto);
@@ -438,13 +462,18 @@ std::unordered_set<std::wstring> g_exceptions;
     return contains(g_exceptions, folded) || (!core.empty() && contains(g_exceptions, core));
 }
 
-[[nodiscard]] bool is_known(const std::wstring& word, Translator::Layout layout, bool allow_short) {
-    if (layout == Translator::Layout::Ru) {
-        return contains(russian_words(), word) || contains(g_extra_ru, word) ||
-               (allow_short && contains(russian_short(), word));
+[[nodiscard]] bool is_known(const std::wstring& word, Translator::Layout layout, bool) {
+    return contains(extra_for(layout), word) || index_for(layout).contains(word);
+}
+
+[[nodiscard]] bool is_dictionary_prefix(const std::wstring& prefix, Translator::Layout layout) {
+    if (prefix.size() < 3) {
+        return false;
     }
-    return contains(english_words(), word) || contains(g_extra_en, word) ||
-           (allow_short && contains(english_short(), word));
+    if (extra_has_prefix(extra_for(layout), prefix)) {
+        return true;
+    }
+    return index_for(layout).has_prefix(prefix);
 }
 
 [[nodiscard]] std::wstring utf8_to_wide(std::string_view text) {
@@ -502,6 +531,30 @@ std::unordered_set<std::wstring> g_exceptions;
 
 bool LayoutDetector::is_technical_token(std::wstring_view text) noexcept {
     return looks_like_url_or_email(text);
+}
+
+void LayoutDetector::load_bundled_dictionaries() {
+    ensure_indexes();
+
+    wchar_t path[MAX_PATH]{};
+    const DWORD length = GetModuleFileNameW(nullptr, path, MAX_PATH);
+    if (length == 0 || length >= MAX_PATH) {
+        return;
+    }
+
+    std::wstring dir = path;
+    const auto slash = dir.find_last_of(L"\\/");
+    if (slash == std::wstring::npos) {
+        return;
+    }
+    dir.resize(slash);
+
+    const bool en = g_en_index.load_utf8_file(dir + L"\\dict\\en.txt");
+    const bool ru = g_ru_index.load_utf8_file(dir + L"\\dict\\ru.txt");
+    if (en || ru) {
+        g_en_index.finalize();
+        g_ru_index.finalize();
+    }
 }
 
 void LayoutDetector::set_user_words(const std::vector<std::string>& extra_en, const std::vector<std::string>& extra_ru) {
@@ -583,6 +636,17 @@ bool LayoutDetector::should_switch(
     }
     if (converted_known) {
         return true;
+    }
+
+    const bool typed_prefix = is_dictionary_prefix(typed_core, source);
+    const bool converted_prefix = is_dictionary_prefix(converted_core, target);
+    if (typed_core.size() >= min_length) {
+        if (typed_prefix && !converted_prefix) {
+            return false;
+        }
+        if (!typed_prefix && converted_prefix) {
+            return true;
+        }
     }
 
     const std::wstring typed_proto = proto_core(typed);

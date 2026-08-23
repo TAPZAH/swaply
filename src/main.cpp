@@ -1,3 +1,12 @@
+/* wxneur — свободный переключатель раскладки для Windows.
+ * Copyright (C) 2026 Tap3ah
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ */
+
 #include "config.h"
 #include "hook_manager.h"
 #include "input_sim.h"
@@ -12,6 +21,7 @@
 #include <stdexcept>
 #include <string>
 #include <system_error>
+#include <utility>
 
 namespace {
 
@@ -85,7 +95,7 @@ public:
         hwnd_ = CreateWindowExW(
             WS_EX_TOOLWINDOW,
             class_name,
-            L"wxneur",
+            L"wxneur 0.97 beta",
             WS_POPUP,
             0,
             0,
@@ -116,11 +126,37 @@ private:
     HWND hwnd_ = nullptr;
 };
 
+struct LastConversion {
+    std::wstring original;
+    std::wstring converted;
+    Translator::Layout source = Translator::Layout::En;
+    Translator::Layout target = Translator::Layout::Ru;
+    UINT terminator = 0;
+    bool valid = false;
+
+    void clear() noexcept {
+        original.clear();
+        converted.clear();
+        terminator = 0;
+        valid = false;
+    }
+
+    void invert() {
+        std::swap(original, converted);
+        std::swap(source, target);
+    }
+
+    [[nodiscard]] std::size_t delete_count() const noexcept {
+        return converted.size() + (terminator != 0 ? 1 : 0);
+    }
+};
+
 struct AppState {
     AppConfig* config = nullptr;
     TrayIcon* tray = nullptr;
     HookManager* hook = nullptr;
     TextTracker* tracker = nullptr;
+    LastConversion last{};
     UINT taskbar_created = 0;
 };
 
@@ -144,7 +180,8 @@ void apply_runtime_config(AppState& state) {
         state.hook->set_hotkeys(
             state.config->convert_word.pack(),
             state.config->convert_selection.pack(),
-            state.config->learn_word.pack());
+            state.config->learn_word.pack(),
+            state.config->undo_conversion.pack());
     }
     sync_tray(state);
 }
@@ -191,14 +228,57 @@ void learn_current_word(AppState& state) {
     MessageBeep(MB_OK);
 }
 
-void convert_current_word(TextTracker& tracker, bool auto_convert) {
+void remember_conversion(
+    AppState& state,
+    std::wstring original,
+    std::wstring converted,
+    Translator::Layout source,
+    UINT terminator) {
+    if (original.empty() || original == converted) {
+        state.last.clear();
+        return;
+    }
+
+    state.last.original = std::move(original);
+    state.last.converted = std::move(converted);
+    state.last.source = source;
+    state.last.target = Translator::opposite(source);
+    state.last.terminator = terminator;
+    state.last.valid = true;
+}
+
+void undo_last_conversion(AppState& state) {
+    if (!state.last.valid) {
+        return;
+    }
+
+    Sleep(15);
+    if (!InputSimulator::replace_text(state.last.delete_count(), state.last.original, state.last.terminator)) {
+        state.last.clear();
+        return;
+    }
+
+    InputSimulator::activate_layout(state.last.source);
+    state.last.invert();
+    if (state.tracker != nullptr) {
+        state.tracker->clear();
+    }
+}
+
+void convert_current_word(AppState& state, bool auto_convert) {
+    if (state.tracker == nullptr) {
+        return;
+    }
+
+    TextTracker& tracker = *state.tracker;
     const std::wstring word = tracker.current_word();
     if (word.empty()) {
         return;
     }
 
     const std::wstring converted = tracker.converted_word();
-    const auto target = Translator::opposite(tracker.source_layout());
+    const auto source = tracker.source_layout();
+    const auto target = Translator::opposite(source);
     const UINT terminator = auto_convert ? tracker.terminator() : 0;
     const std::size_t delete_count = word.size() + (terminator != 0 ? 1 : 0);
 
@@ -208,8 +288,12 @@ void convert_current_word(TextTracker& tracker, bool auto_convert) {
         }
         if (!InputSimulator::replace_text(delete_count, converted, terminator)) {
             tracker.clear();
+            state.last.clear();
             return;
         }
+        remember_conversion(state, word, converted, source, terminator);
+    } else {
+        state.last.clear();
     }
 
     if (auto_convert) {
@@ -230,19 +314,26 @@ void drain_key_queue(AppState& state) {
     while (state.hook->try_pop(event)) {
         switch (state.tracker->on_key(event)) {
         case TextTracker::Action::ConvertWord:
-            convert_current_word(*state.tracker, false);
+            convert_current_word(state, false);
             break;
         case TextTracker::Action::AutoConvert:
-            convert_current_word(*state.tracker, true);
+            convert_current_word(state, true);
             break;
         case TextTracker::Action::ConvertSelection:
             InputSimulator::convert_selection();
+            state.last.clear();
             if (state.tracker != nullptr) {
                 state.tracker->clear();
             }
             break;
         case TextTracker::Action::LearnWord:
             learn_current_word(state);
+            break;
+        case TextTracker::Action::Undo:
+            undo_last_conversion(state);
+            break;
+        case TextTracker::Action::DiscardUndo:
+            state.last.clear();
             break;
         case TextTracker::Action::None:
             break;
@@ -263,11 +354,18 @@ bool handle_command(AppState& state, HWND hwnd, WPARAM wparam) {
         if (state.tracker != nullptr) {
             state.tracker->clear();
         }
+        state.last.clear();
         return true;
     case TrayIcon::auto_switch_command_id:
         state.config->auto_switch = !state.config->auto_switch;
         state.config->save();
         sync_tray(state);
+        return true;
+    case TrayIcon::undo_command_id:
+        undo_last_conversion(state);
+        return true;
+    case TrayIcon::about_command_id:
+        show_about_dialog(hwnd);
         return true;
     case TrayIcon::settings_command_id:
         if (show_settings_dialog(hwnd, *state.config)) {
@@ -277,6 +375,7 @@ bool handle_command(AppState& state, HWND hwnd, WPARAM wparam) {
             if (state.tracker != nullptr) {
                 state.tracker->clear();
             }
+            state.last.clear();
         }
         return true;
     case TrayIcon::autostart_command_id:
@@ -306,6 +405,7 @@ LRESULT CALLBACK hidden_wnd_proc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lpar
             if (state->tracker != nullptr) {
                 state->tracker->clear();
             }
+            state->last.clear();
             return 0;
         }
 
@@ -343,6 +443,7 @@ int run(HINSTANCE instance) {
     }
 
     AppConfig config = AppConfig::load();
+    LayoutDetector::load_bundled_dictionaries();
     LayoutDetector::set_user_words(config.extra_en, config.extra_ru);
     LayoutDetector::set_exceptions(config.exceptions);
 
@@ -351,7 +452,11 @@ int run(HINSTANCE instance) {
 
     TrayIcon tray(instance, window.get());
     HookManager hook(window.get());
-    hook.set_hotkeys(config.convert_word.pack(), config.convert_selection.pack(), config.learn_word.pack());
+    hook.set_hotkeys(
+        config.convert_word.pack(),
+        config.convert_selection.pack(),
+        config.learn_word.pack(),
+        config.undo_conversion.pack());
     TextTracker tracker(config);
 
     AppState state{};

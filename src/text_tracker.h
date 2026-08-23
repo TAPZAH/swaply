@@ -17,6 +17,8 @@ public:
         AutoConvert,
         ConvertSelection,
         LearnWord,
+        Undo,
+        DiscardUndo,
     };
 
     struct Glyph {

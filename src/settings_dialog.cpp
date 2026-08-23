@@ -1,5 +1,6 @@
 #include "settings_dialog.h"
 
+#include "hotkey.h"
 #include "resource.h"
 
 #include <commctrl.h>
@@ -11,31 +12,32 @@ namespace {
 
 struct DialogState {
     AppConfig* config = nullptr;
-    Hotkey convert_word{};
-    Hotkey convert_selection{};
-    Hotkey learn_word{};
-    int capture = 0;
 };
 
-[[nodiscard]] bool is_modifier_vk(UINT vk) noexcept {
-    switch (vk) {
-    case VK_SHIFT:
-    case VK_LSHIFT:
-    case VK_RSHIFT:
-    case VK_CONTROL:
-    case VK_LCONTROL:
-    case VK_RCONTROL:
-    case VK_MENU:
-    case VK_LMENU:
-    case VK_RMENU:
-    case VK_LWIN:
-    case VK_RWIN:
-    case VK_CAPITAL:
-        return true;
-    default:
-        return false;
-    }
-}
+struct HotkeyControls {
+    int ctrl_id;
+    int alt_id;
+    int shift_id;
+    int combo_id;
+};
+
+constexpr HotkeyControls kConvert{IDC_CHK_CONVERT_CTRL, IDC_CHK_CONVERT_ALT, IDC_CHK_CONVERT_SHIFT, IDC_CMB_CONVERT};
+constexpr HotkeyControls kSelection{IDC_CHK_SEL_CTRL, IDC_CHK_SEL_ALT, IDC_CHK_SEL_SHIFT, IDC_CMB_SEL};
+constexpr HotkeyControls kLearn{IDC_CHK_LEARN_CTRL, IDC_CHK_LEARN_ALT, IDC_CHK_LEARN_SHIFT, IDC_CMB_LEARN};
+constexpr HotkeyControls kUndo{IDC_CHK_UNDO_CTRL, IDC_CHK_UNDO_ALT, IDC_CHK_UNDO_SHIFT, IDC_CMB_UNDO};
+
+constexpr UINT kKeyChoices[] = {
+    VK_PAUSE, VK_SCROLL, VK_CAPITAL, VK_INSERT, VK_DELETE, VK_HOME, VK_END,
+    VK_PRIOR, VK_NEXT,   VK_SPACE,   VK_BACK,   VK_TAB,    VK_SNAPSHOT,
+    VK_F1,    VK_F2,     VK_F3,      VK_F4,     VK_F5,     VK_F6,
+    VK_F7,    VK_F8,     VK_F9,      VK_F10,    VK_F11,    VK_F12,
+    'A',      'B',       'C',        'D',      'E',       'F',
+    'G',      'H',       'I',        'J',      'K',       'L',
+    'M',      'N',       'O',        'P',      'Q',       'R',
+    'S',      'T',       'U',        'V',      'W',       'X',
+    'Y',      'Z',       '0',        '1',      '2',       '3',
+    '4',      '5',       '6',        '7',      '8',       '9',
+};
 
 [[nodiscard]] std::wstring utf8_to_wide(std::string_view text) {
     if (text.empty()) {
@@ -126,22 +128,61 @@ void set_text(HWND hwnd, int id, const std::wstring& text) {
     return text;
 }
 
-void refresh_hotkey_buttons(HWND hwnd, const DialogState& state) {
-    const wchar_t* capture_text = L"Нажмите комбинацию...";
-    set_text(hwnd, IDC_BTN_CONVERT, state.capture == 1 ? capture_text : state.convert_word.to_wstring());
-    set_text(hwnd, IDC_BTN_SELECTION, state.capture == 2 ? capture_text : state.convert_selection.to_wstring());
-    set_text(hwnd, IDC_BTN_LEARN, state.capture == 3 ? capture_text : state.learn_word.to_wstring());
+void fill_key_combo(HWND combo, UINT selected) {
+    SendMessageW(combo, CB_RESETCONTENT, 0, 0);
+
+    int select_index = 0;
+    bool found = false;
+    const UINT normalized = (selected == VK_CANCEL) ? VK_PAUSE : selected;
+
+    for (const UINT vk : kKeyChoices) {
+        const std::wstring name = Hotkey::key_name(vk);
+        const int index = static_cast<int>(SendMessageW(combo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(name.c_str())));
+        if (index < 0) {
+            continue;
+        }
+        SendMessageW(combo, CB_SETITEMDATA, static_cast<WPARAM>(index), static_cast<LPARAM>(vk));
+        if (vk == normalized) {
+            select_index = index;
+            found = true;
+        }
+    }
+
+    if (!found && normalized != 0) {
+        const std::wstring name = Hotkey::key_name(normalized);
+        const int index =
+            static_cast<int>(SendMessageW(combo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(name.c_str())));
+        if (index >= 0) {
+            SendMessageW(combo, CB_SETITEMDATA, static_cast<WPARAM>(index), static_cast<LPARAM>(normalized));
+            select_index = index;
+        }
+    }
+
+    SendMessageW(combo, CB_SETCURSEL, static_cast<WPARAM>(select_index), 0);
 }
 
-void apply_captured_hotkey(DialogState& state, const Hotkey& key) {
-    if (state.capture == 1) {
-        state.convert_word = key;
-    } else if (state.capture == 2) {
-        state.convert_selection = key;
-    } else if (state.capture == 3) {
-        state.learn_word = key;
+[[nodiscard]] UINT combo_vk(HWND combo) {
+    const int index = static_cast<int>(SendMessageW(combo, CB_GETCURSEL, 0, 0));
+    if (index < 0) {
+        return 0;
     }
-    state.capture = 0;
+    return static_cast<UINT>(SendMessageW(combo, CB_GETITEMDATA, static_cast<WPARAM>(index), 0));
+}
+
+void write_hotkey(HWND hwnd, const HotkeyControls& ids, const Hotkey& key) {
+    set_check(hwnd, ids.ctrl_id, key.ctrl);
+    set_check(hwnd, ids.alt_id, key.alt);
+    set_check(hwnd, ids.shift_id, key.shift);
+    fill_key_combo(GetDlgItem(hwnd, ids.combo_id), key.vk);
+}
+
+[[nodiscard]] Hotkey read_hotkey(HWND hwnd, const HotkeyControls& ids) {
+    Hotkey key{};
+    key.ctrl = get_check(hwnd, ids.ctrl_id);
+    key.alt = get_check(hwnd, ids.alt_id);
+    key.shift = get_check(hwnd, ids.shift_id);
+    key.vk = combo_vk(GetDlgItem(hwnd, ids.combo_id));
+    return key;
 }
 
 INT_PTR CALLBACK settings_proc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
@@ -164,7 +205,10 @@ INT_PTR CALLBACK settings_proc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam
         set_text(hwnd, IDC_EDIT_EXTRA_EN, join_lines(state->config->extra_en));
         set_text(hwnd, IDC_EDIT_EXTRA_RU, join_lines(state->config->extra_ru));
         set_text(hwnd, IDC_EDIT_EXCEPTIONS, join_lines(state->config->exceptions));
-        refresh_hotkey_buttons(hwnd, *state);
+        write_hotkey(hwnd, kConvert, state->config->convert_word);
+        write_hotkey(hwnd, kSelection, state->config->convert_selection);
+        write_hotkey(hwnd, kLearn, state->config->learn_word);
+        write_hotkey(hwnd, kUndo, state->config->undo_conversion);
         return TRUE;
     }
 
@@ -172,43 +216,8 @@ INT_PTR CALLBACK settings_proc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam
         return FALSE;
     }
 
-    if ((msg == WM_KEYDOWN || msg == WM_SYSKEYDOWN) && state->capture != 0) {
-        const UINT vk_raw = static_cast<UINT>(wparam);
-        if (vk_raw == VK_ESCAPE) {
-            state->capture = 0;
-            refresh_hotkey_buttons(hwnd, *state);
-            return TRUE;
-        }
-        if (is_modifier_vk(vk_raw)) {
-            return TRUE;
-        }
-
-        Hotkey key{};
-        key.vk = (vk_raw == VK_CANCEL) ? VK_PAUSE : vk_raw;
-        key.ctrl = GetKeyState(VK_CONTROL) < 0;
-        key.alt = GetKeyState(VK_MENU) < 0;
-        key.shift = GetKeyState(VK_SHIFT) < 0;
-        key.win = GetKeyState(VK_LWIN) < 0 || GetKeyState(VK_RWIN) < 0;
-        apply_captured_hotkey(*state, key);
-        refresh_hotkey_buttons(hwnd, *state);
-        return TRUE;
-    }
-
     if (msg == WM_COMMAND) {
         const int id = LOWORD(wparam);
-        if (id == IDC_BTN_CONVERT || id == IDC_BTN_SELECTION || id == IDC_BTN_LEARN) {
-            if (id == IDC_BTN_CONVERT) {
-                state->capture = 1;
-            } else if (id == IDC_BTN_SELECTION) {
-                state->capture = 2;
-            } else {
-                state->capture = 3;
-            }
-            refresh_hotkey_buttons(hwnd, *state);
-            SetFocus(hwnd);
-            return TRUE;
-        }
-
         if (id == IDOK) {
             BOOL translated = FALSE;
             const UINT min_length = GetDlgItemInt(hwnd, IDC_EDIT_MINLEN, &translated, FALSE);
@@ -220,9 +229,10 @@ INT_PTR CALLBACK settings_proc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam
             state->config->auto_switch = get_check(hwnd, IDC_CHK_AUTO);
             state->config->ignore_password_fields = get_check(hwnd, IDC_CHK_PASSWORD);
             state->config->start_with_windows = get_check(hwnd, IDC_CHK_AUTOSTART);
-            state->config->convert_word = state->convert_word;
-            state->config->convert_selection = state->convert_selection;
-            state->config->learn_word = state->learn_word;
+            state->config->convert_word = read_hotkey(hwnd, kConvert);
+            state->config->convert_selection = read_hotkey(hwnd, kSelection);
+            state->config->learn_word = read_hotkey(hwnd, kLearn);
+            state->config->undo_conversion = read_hotkey(hwnd, kUndo);
             state->config->excluded_processes = split_lines(get_text(hwnd, IDC_EDIT_EXCLUDED));
             state->config->extra_en = split_lines(get_text(hwnd, IDC_EDIT_EXTRA_EN));
             state->config->extra_ru = split_lines(get_text(hwnd, IDC_EDIT_EXTRA_RU));
@@ -242,6 +252,26 @@ INT_PTR CALLBACK settings_proc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam
 
 }  // namespace
 
+INT_PTR CALLBACK about_proc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM) {
+    if (msg == WM_INITDIALOG) {
+        return TRUE;
+    }
+    if (msg == WM_COMMAND && (LOWORD(wparam) == IDOK || LOWORD(wparam) == IDCANCEL)) {
+        EndDialog(hwnd, IDOK);
+        return TRUE;
+    }
+    return FALSE;
+}
+
+void show_about_dialog(HWND parent) {
+    DialogBoxParamW(
+        GetModuleHandleW(nullptr),
+        MAKEINTRESOURCEW(IDD_ABOUT),
+        parent,
+        about_proc,
+        0);
+}
+
 bool show_settings_dialog(HWND parent, AppConfig& config) {
     INITCOMMONCONTROLSEX icc{};
     icc.dwSize = sizeof(icc);
@@ -250,9 +280,6 @@ bool show_settings_dialog(HWND parent, AppConfig& config) {
 
     DialogState state{};
     state.config = &config;
-    state.convert_word = config.convert_word;
-    state.convert_selection = config.convert_selection;
-    state.learn_word = config.learn_word;
 
     const HINSTANCE instance = GetModuleHandleW(nullptr);
     const INT_PTR result = DialogBoxParamW(

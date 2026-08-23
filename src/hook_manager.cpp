@@ -62,10 +62,11 @@ HookManager::~HookManager() {
     uninstall();
 }
 
-void HookManager::set_hotkeys(UINT convert_word, UINT convert_selection, UINT learn_word) noexcept {
+void HookManager::set_hotkeys(UINT convert_word, UINT convert_selection, UINT learn_word, UINT undo) noexcept {
     convert_hotkey_.store(convert_word, std::memory_order_relaxed);
     selection_hotkey_.store(convert_selection, std::memory_order_relaxed);
     learn_hotkey_.store(learn_word, std::memory_order_relaxed);
+    undo_hotkey_.store(undo, std::memory_order_relaxed);
 }
 
 bool HookManager::matches_hotkey(const KeyEvent& event) const noexcept {
@@ -75,7 +76,8 @@ bool HookManager::matches_hotkey(const KeyEvent& event) const noexcept {
     };
     return matches_packed(convert_hotkey_.load(std::memory_order_relaxed)) ||
            matches_packed(selection_hotkey_.load(std::memory_order_relaxed)) ||
-           matches_packed(learn_hotkey_.load(std::memory_order_relaxed));
+           matches_packed(learn_hotkey_.load(std::memory_order_relaxed)) ||
+           matches_packed(undo_hotkey_.load(std::memory_order_relaxed));
 }
 
 void HookManager::uninstall() noexcept {

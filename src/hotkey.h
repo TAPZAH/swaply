@@ -20,4 +20,5 @@ struct Hotkey {
 
     static Hotkey unpack(UINT packed) noexcept;
     static Hotkey parse(std::string_view text);
+    [[nodiscard]] static std::wstring key_name(UINT vk);
 };

@@ -11,6 +11,7 @@ class LayoutDetector {
 public:
     static constexpr std::size_t min_word_length = 3;
 
+    static void load_bundled_dictionaries();
     static void set_user_words(const std::vector<std::string>& extra_en, const std::vector<std::string>& extra_ru);
     static void set_exceptions(const std::vector<std::string>& words);
 

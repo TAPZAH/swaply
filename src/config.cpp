@@ -249,6 +249,16 @@ void apply_field(AppConfig& config, const std::string& key, std::string_view tex
         }
         return;
     }
+    if (key == "undo_hotkey") {
+        std::string value;
+        if (parse_string(text, i, value) && !value.empty()) {
+            Hotkey parsed = Hotkey::parse(value);
+            if (parsed.vk != 0) {
+                config.undo_conversion = parsed;
+            }
+        }
+        return;
+    }
     if (key == "excluded_processes") {
         static_cast<void>(parse_string_array(text, i, config.excluded_processes));
         return;
@@ -426,6 +436,7 @@ void AppConfig::save() const {
        << "  \"convert_word_hotkey\": \"" << json_escape(convert_word.to_string()) << "\",\n"
        << "  \"convert_selection_hotkey\": \"" << json_escape(convert_selection.to_string()) << "\",\n"
        << "  \"learn_word_hotkey\": \"" << json_escape(learn_word.to_string()) << "\",\n"
+       << "  \"undo_hotkey\": \"" << json_escape(undo_conversion.to_string()) << "\",\n"
        << "  \"start_with_windows\": " << (start_with_windows ? "true" : "false") << ",\n";
     write_string_array(ss, "excluded_processes", excluded_processes);
     ss << ",\n";

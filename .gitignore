@@ -1,4 +1,8 @@
 build/
+dist/
 .vs/
 CMakeUserPresets.json
 *.user
+*.aps
+*.sdf
+*.opensdf

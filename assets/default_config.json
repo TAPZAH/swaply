@@ -6,6 +6,7 @@
   "convert_word_hotkey": "Pause",
   "convert_selection_hotkey": "Ctrl+Pause",
   "learn_word_hotkey": "Alt+Pause",
+  "undo_hotkey": "Shift+Pause",
   "start_with_windows": false,
   "excluded_processes": [
     "keepass.exe",

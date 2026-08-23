@@ -30,7 +30,7 @@ public:
     HookManager& operator=(HookManager&&) = delete;
 
     void uninstall() noexcept;
-    void set_hotkeys(UINT convert_word, UINT convert_selection, UINT learn_word) noexcept;
+    void set_hotkeys(UINT convert_word, UINT convert_selection, UINT learn_word, UINT undo) noexcept;
     [[nodiscard]] bool try_pop(KeyEvent& out);
 
 private:
@@ -49,6 +49,7 @@ private:
     std::atomic<UINT> convert_hotkey_{0};
     std::atomic<UINT> selection_hotkey_{0};
     std::atomic<UINT> learn_hotkey_{0};
+    std::atomic<UINT> undo_hotkey_{0};
     std::mutex mutex_;
     std::deque<KeyEvent> queue_;
 };

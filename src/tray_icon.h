@@ -11,6 +11,8 @@ public:
     static constexpr UINT auto_switch_command_id = 3;
     static constexpr UINT autostart_command_id = 4;
     static constexpr UINT settings_command_id = 5;
+    static constexpr UINT undo_command_id = 6;
+    static constexpr UINT about_command_id = 7;
 
     TrayIcon(HINSTANCE instance, HWND window);
     ~TrayIcon();

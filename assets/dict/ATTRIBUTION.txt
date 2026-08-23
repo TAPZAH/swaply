@@ -1,0 +1,5 @@
+English and Russian word lists are derived from FrequencyWords
+https://github.com/hermitdave/FrequencyWords
+Content license: CC-BY-SA-4.0
+Source corpus: OpenSubtitles 2018 (OPUS)
+Top 30,000 alphabetic tokens per language, used for layout detection.

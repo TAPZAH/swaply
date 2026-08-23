@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.16)
 
-project(wxneur LANGUAGES CXX)
+project(wxneur VERSION 0.97.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -14,6 +14,7 @@ add_executable(wxneur
     src/text_tracker.cpp
     src/translator.cpp
     src/layout_detector.cpp
+    src/word_index.cpp
     src/focus_guard.cpp
     src/input_sim.cpp
     src/tray_icon.cpp
@@ -47,6 +48,9 @@ add_custom_command(TARGET wxneur POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         "${CMAKE_SOURCE_DIR}/assets/default_config.json"
         "$<TARGET_FILE_DIR:wxneur>/default_config.json"
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "${CMAKE_SOURCE_DIR}/assets/dict"
+        "$<TARGET_FILE_DIR:wxneur>/dict"
 )
 
 if(MSVC)
@@ -68,6 +72,7 @@ add_executable(wxneur_tests
     tests/test_core.cpp
     src/translator.cpp
     src/layout_detector.cpp
+    src/word_index.cpp
     src/hotkey.cpp
 )
 
@@ -81,6 +86,12 @@ target_compile_definitions(wxneur_tests PRIVATE
     _WIN32_WINNT=0x0A00
 )
 target_link_libraries(wxneur_tests PRIVATE user32)
+
+add_custom_command(TARGET wxneur_tests POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "${CMAKE_SOURCE_DIR}/assets/dict"
+        "$<TARGET_FILE_DIR:wxneur_tests>/dict"
+)
 
 if(MSVC)
     target_compile_options(wxneur_tests PRIVATE /W4 /permissive- /utf-8)

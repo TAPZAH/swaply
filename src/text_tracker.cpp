@@ -97,9 +97,12 @@ TextTracker::Action TextTracker::on_key(const HookManager::KeyEvent& event) {
         };
 
         if (matches(config_->convert_word) || matches(config_->convert_selection) ||
-            matches(config_->learn_word)) {
+            matches(config_->learn_word) || matches(config_->undo_conversion)) {
             if (is_key_up(event.wparam)) {
                 return Action::None;
+            }
+            if (matches(config_->undo_conversion)) {
+                return Action::Undo;
             }
             if (matches(config_->convert_selection)) {
                 return Action::ConvertSelection;
@@ -107,8 +110,8 @@ TextTracker::Action TextTracker::on_key(const HookManager::KeyEvent& event) {
             if (matches(config_->learn_word) && !glyphs_.empty()) {
                 return Action::LearnWord;
             }
-            if (matches(config_->convert_word) && !glyphs_.empty()) {
-                return Action::ConvertWord;
+            if (matches(config_->convert_word)) {
+                return glyphs_.empty() ? Action::Undo : Action::ConvertWord;
             }
             return Action::None;
         }
@@ -120,14 +123,14 @@ TextTracker::Action TextTracker::on_key(const HookManager::KeyEvent& event) {
 
     if (event.ctrl || event.alt || event.win) {
         clear();
-        return Action::None;
+        return Action::DiscardUndo;
     }
 
     if (vk == VK_BACK) {
         if (!glyphs_.empty()) {
             glyphs_.pop_back();
         }
-        return Action::None;
+        return Action::DiscardUndo;
     }
 
     if (is_word_break(vk)) {
@@ -142,21 +145,29 @@ TextTracker::Action TextTracker::on_key(const HookManager::KeyEvent& event) {
             }
         }
         clear();
-        return Action::None;
+        return Action::DiscardUndo;
     }
 
     const auto layout = Translator::detect_layout(foreground_layout());
     const auto ch = Translator::char_from_vk(vk, event.shift, event.caps, layout);
     if (!ch.has_value()) {
         clear();
-        return Action::None;
+        return Action::DiscardUndo;
     }
 
     if (glyphs_.size() < max_word_length) {
         glyphs_.push_back(Glyph{*ch, vk, event.shift, event.caps, layout});
     }
 
-    return Action::None;
+    if (config_ != nullptr && config_->auto_switch) {
+        const std::size_t min_length = config_->min_word_length;
+        if (LayoutDetector::should_switch(current_word(), converted_word(), source_layout(), min_length)) {
+            terminator_ = 0;
+            return Action::AutoConvert;
+        }
+    }
+
+    return Action::DiscardUndo;
 }
 
 void TextTracker::clear() noexcept {

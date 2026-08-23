@@ -16,6 +16,7 @@ struct AppConfig {
     Hotkey convert_word{VK_PAUSE, false, false, false, false};
     Hotkey convert_selection{VK_PAUSE, true, false, false, false};
     Hotkey learn_word{VK_PAUSE, false, true, false, false};
+    Hotkey undo_conversion{VK_PAUSE, false, false, true, false};
     bool start_with_windows = false;
     std::vector<std::string> excluded_processes;
     std::vector<std::string> extra_en;

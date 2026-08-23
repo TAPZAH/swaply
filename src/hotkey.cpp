@@ -82,6 +82,24 @@ namespace {
     if (vk == VK_SPACE) {
         return L"Space";
     }
+    if (vk == VK_BACK) {
+        return L"Backspace";
+    }
+    if (vk == VK_TAB) {
+        return L"Tab";
+    }
+    if (vk == VK_CAPITAL) {
+        return L"Caps Lock";
+    }
+    if (vk == VK_PRIOR) {
+        return L"Page Up";
+    }
+    if (vk == VK_NEXT) {
+        return L"Page Down";
+    }
+    if (vk == VK_SNAPSHOT) {
+        return L"Print Screen";
+    }
     if (vk >= VK_F1 && vk <= VK_F24) {
         return L"F" + std::to_wstring(vk - VK_F1 + 1);
     }
@@ -169,6 +187,10 @@ std::string Hotkey::to_string() const {
         }
     }
     return text;
+}
+
+std::wstring Hotkey::key_name(UINT vk) {
+    return vk_to_name(vk);
 }
 
 Hotkey Hotkey::parse(std::string_view text) {

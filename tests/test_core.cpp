@@ -30,6 +30,8 @@ void expect_eq(std::wstring_view actual, std::wstring_view wanted, const char* n
 }  // namespace
 
 int main() {
+    LayoutDetector::load_bundled_dictionaries();
+
     expect_eq(Translator::convert(L"ghbdtn"), L"привет", "en_keys_to_ru_privet");
     expect_eq(Translator::convert(L"руддщ"), L"hello", "ru_keys_to_en_hello");
     expect_eq(Translator::convert(L"Ghbdtn"), L"Привет", "preserve_case");
@@ -57,6 +59,16 @@ int main() {
     expect(LayoutDetector::is_exception_word(L"httpabc", Translator::Layout::En), "http_is_exception");
     expect(LayoutDetector::should_switch(L"fqfzjx", L"айаяоч", Translator::Layout::En), "proto_impossible_en");
 
+    expect_eq(Translator::convert(L"cltkfq"), L"сделай", "en_keys_to_ru_sdelay");
+    expect_eq(Translator::convert(L"yfghbvth"), L"например", "en_keys_to_ru_naprimer");
+    expect(LayoutDetector::should_switch(L"cltkfq", L"сделай", Translator::Layout::En), "dict_sdelay");
+    expect(LayoutDetector::should_switch(L"yfghbvth", L"например", Translator::Layout::En), "dict_naprimer");
+    expect(LayoutDetector::should_switch(L"clt", L"сде", Translator::Layout::En), "prefix_sde");
+    expect(LayoutDetector::should_switch(L"yfg", L"нап", Translator::Layout::En), "prefix_nap");
+    expect(!LayoutDetector::should_switch(L"hel", L"руд", Translator::Layout::En), "keep_en_prefix_hel");
+    expect(!LayoutDetector::should_switch(L"сделай", L"cltkfq", Translator::Layout::Ru), "keep_sdelay_ru");
+    expect(!LayoutDetector::should_switch(L"например", L"yfghbvth", Translator::Layout::Ru), "keep_naprimer_ru");
+
     LayoutDetector::set_exceptions({"brandword"});
     expect(!LayoutDetector::should_switch(L"brandword", L"икфтвцщкв", Translator::Layout::En), "user_exception");
 
@@ -68,6 +80,11 @@ int main() {
     expect(alt_f12.vk == VK_F12 && alt_f12.alt && !alt_f12.ctrl, "parse_alt_f12");
     expect(ctrl_pause.matches(VK_CANCEL, true, false, false, false), "pause_cancel_alias");
     expect(ctrl_pause.to_string() == "Ctrl+Pause", "format_ctrl_pause");
+    const Hotkey shift_pause = Hotkey::parse("Shift+Pause");
+    expect(shift_pause.vk == VK_PAUSE && shift_pause.shift && !shift_pause.ctrl, "parse_shift_pause");
+    expect(shift_pause.to_string() == "Shift+Pause", "format_shift_pause");
+    expect(Hotkey::key_name(VK_PAUSE) == L"Pause", "key_name_pause");
+    expect(Hotkey::key_name('A') == L"A", "key_name_a");
 
     if (g_failed != 0) {
         std::cerr << g_failed << " test(s) failed\n";

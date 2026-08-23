@@ -1,0 +1,44 @@
+#pragma code_page(65001)
+#include <windows.h>
+#include <commctrl.h>
+#include "resource.h"
+
+IDI_APPICON ICON "assets/icon.ico"
+
+IDD_SETTINGS DIALOGEX 0, 0, 360, 368
+STYLE DS_SETFONT | DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Параметры wxneur"
+FONT 9, "Segoe UI", 400, 0, 0x1
+BEGIN
+    AUTOCHECKBOX "Включено", IDC_CHK_ENABLED, 12, 10, 160, 12
+    AUTOCHECKBOX "Автопереключение раскладки", IDC_CHK_AUTO, 12, 24, 200, 12
+    AUTOCHECKBOX "Игнорировать поля пароля", IDC_CHK_PASSWORD, 12, 38, 200, 12
+    AUTOCHECKBOX "Запускать вместе с Windows", IDC_CHK_AUTOSTART, 12, 52, 200, 12
+
+    LTEXT "Минимальная длина слова:", -1, 12, 72, 140, 10
+    EDITTEXT IDC_EDIT_MINLEN, 156, 70, 28, 12, ES_NUMBER | ES_AUTOHSCROLL
+
+    GROUPBOX "Горячие клавиши", -1, 8, 88, 344, 78
+    LTEXT "Конвертировать слово:", -1, 16, 104, 130, 10
+    PUSHBUTTON "Pause", IDC_BTN_CONVERT, 150, 102, 190, 14
+    LTEXT "Конвертировать выделение:", -1, 16, 122, 130, 10
+    PUSHBUTTON "Ctrl+Pause", IDC_BTN_SELECTION, 150, 120, 190, 14
+    LTEXT "Добавить в словарь:", -1, 16, 140, 130, 10
+    PUSHBUTTON "Alt+Pause", IDC_BTN_LEARN, 150, 138, 190, 14
+    LTEXT "Нажмите кнопку, затем новую комбинацию. Esc — отмена.", -1, 16, 156, 328, 8
+
+    LTEXT "Исключённые процессы (по одному в строке):", -1, 12, 174, 280, 10
+    EDITTEXT IDC_EDIT_EXCLUDED, 12, 186, 336, 28, ES_MULTILINE | ES_WANTRETURN | ES_AUTOVSCROLL | WS_VSCROLL | WS_TABSTOP
+
+    LTEXT "Английский словарь:", -1, 12, 220, 160, 10
+    EDITTEXT IDC_EDIT_EXTRA_EN, 12, 232, 164, 36, ES_MULTILINE | ES_WANTRETURN | ES_AUTOVSCROLL | WS_VSCROLL | WS_TABSTOP
+    LTEXT "Русский словарь:", -1, 184, 220, 160, 10
+    EDITTEXT IDC_EDIT_EXTRA_RU, 184, 232, 164, 36, ES_MULTILINE | ES_WANTRETURN | ES_AUTOVSCROLL | WS_VSCROLL | WS_TABSTOP
+
+    LTEXT "Словарь исключений (не переключать эти слова):", -1, 12, 274, 300, 10
+    EDITTEXT IDC_EDIT_EXCEPTIONS, 12, 286, 336, 36, ES_MULTILINE | ES_WANTRETURN | ES_AUTOVSCROLL | WS_VSCROLL | WS_TABSTOP
+    LTEXT "Встроенные правила xneur: http, ftp, www, IP, MAC, .рф, частицы а/в/и/к/ну/о/у/я.", -1, 12, 326, 336, 10
+
+    DEFPUSHBUTTON "ОК", IDOK, 248, 346, 50, 14
+    PUSHBUTTON "Отмена", IDCANCEL, 302, 346, 50, 14
+END

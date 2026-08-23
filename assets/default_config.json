@@ -1,0 +1,18 @@
+{
+  "enabled": true,
+  "auto_switch": true,
+  "ignore_password_fields": true,
+  "min_word_length": 3,
+  "convert_word_hotkey": "Pause",
+  "convert_selection_hotkey": "Ctrl+Pause",
+  "learn_word_hotkey": "Alt+Pause",
+  "start_with_windows": false,
+  "excluded_processes": [
+    "keepass.exe",
+    "keepassxc.exe",
+    "1password.exe"
+  ],
+  "extra_en": [],
+  "extra_ru": [],
+  "exceptions": []
+}

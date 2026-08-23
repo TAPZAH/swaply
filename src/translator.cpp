@@ -83,13 +83,24 @@ constexpr std::array<KeyGlyphs, 47> kKeys{{
     return upper ? key.en_shift : key.en;
 }
 
-[[nodiscard]] const std::unordered_map<wchar_t, wchar_t>& conversion_map() {
+[[nodiscard]] const std::unordered_map<wchar_t, wchar_t>& map_en_to_ru() {
     static const auto map = [] {
         std::unordered_map<wchar_t, wchar_t> result;
-        result.reserve(kKeys.size() * 4);
+        result.reserve(kKeys.size() * 2);
         for (const auto& key : kKeys) {
             result.emplace(key.en, key.ru);
             result.emplace(key.en_shift, key.ru_shift);
+        }
+        return result;
+    }();
+    return map;
+}
+
+[[nodiscard]] const std::unordered_map<wchar_t, wchar_t>& map_ru_to_en() {
+    static const auto map = [] {
+        std::unordered_map<wchar_t, wchar_t> result;
+        result.reserve(kKeys.size() * 2);
+        for (const auto& key : kKeys) {
             result.emplace(key.ru, key.en);
             result.emplace(key.ru_shift, key.en_shift);
         }
@@ -160,7 +171,8 @@ std::optional<wchar_t> Translator::char_from_vk(UINT vk, bool shift, bool caps, 
 }
 
 std::wstring Translator::convert(std::wstring_view text) {
-    const auto& map = conversion_map();
+    const auto source = infer_layout(text);
+    const auto& map = (source == Layout::Ru) ? map_ru_to_en() : map_en_to_ru();
     std::wstring result;
     result.reserve(text.size());
 

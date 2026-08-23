@@ -51,6 +51,8 @@ int main() {
 
     expect(Translator::char_from_vk('G', false, false, Translator::Layout::En) == L'g', "vk_g_en");
     expect(Translator::char_from_vk('G', false, false, Translator::Layout::Ru) == L'п', "vk_g_ru");
+    expect(Translator::char_from_vk('J', false, false, Translator::Layout::En) == L'j', "vk_j_en");
+    expect(Translator::char_from_vk('J', false, false, Translator::Layout::Ru) == L'о', "vk_j_ru");
     expect(Translator::opposite(Translator::Layout::En) == Translator::Layout::Ru, "opposite");
 
     expect(LayoutDetector::should_switch(L"ghbdtn", L"привет", Translator::Layout::En), "auto_ru_word");
@@ -71,7 +73,17 @@ int main() {
     expect(LayoutDetector::is_exception_word(L"httpabc", Translator::Layout::En), "http_is_exception");
     expect(LayoutDetector::should_switch(L"fqfzjx", L"айаяоч", Translator::Layout::En), "proto_impossible_en");
 
-    expect_eq(Translator::convert(L"cltkfq"), L"сделай", "en_keys_to_ru_sdelay");
+    expect_eq(Translator::convert(L"j,yjdb"), L"обнови", "en_j_to_ru_o");
+    expect_eq(Translator::convert(L"jib,rf"), L"ошибка", "en_jib_to_oshibka");
+    expect_eq(Translator::convert(L"ошибка"), L"jib,rf", "ru_oshibka_to_en");
+    expect_eq(Translator::convert(L"xnj-nj"), L"что-то", "en_xnj_nj_to_chto_to");
+    expect(LayoutDetector::should_switch(L"jlby", L"один", Translator::Layout::En), "en_j_as_ru_o");
+    expect(LayoutDetector::should_switch(L"xnj-nj", L"что-то", Translator::Layout::En), "hyphen_chto_to");
+    expect(LayoutDetector::should_switch(L"jib,rf", L"ошибка", Translator::Layout::En), "comma_oshibka");
+    expect(LayoutDetector::should_switch(L"htfkbpjdfyf", L"реализована", Translator::Layout::En),
+           "inflected_realizovana");
+    expect(!LayoutDetector::should_switch(L"well-known", Translator::convert(L"well-known"), Translator::Layout::En),
+           "keep_hyphen_en");
     expect_eq(Translator::convert(L"yfghbvth"), L"например", "en_keys_to_ru_naprimer");
     expect(LayoutDetector::should_switch(L"cltkfq", L"сделай", Translator::Layout::En), "dict_sdelay");
     expect(LayoutDetector::should_switch(L"yfghbvth", L"например", Translator::Layout::En), "dict_naprimer");
@@ -124,16 +136,36 @@ int main() {
     TextTracker auto_tracker(auto_config);
     expect(auto_tracker.on_key(key_event('C', en)) == TextTracker::Action::DiscardUndo, "prefix_c");
     expect(auto_tracker.on_key(key_event('L', en)) == TextTracker::Action::DiscardUndo, "prefix_cl");
-    expect(auto_tracker.on_key(key_event('T', en)) == TextTracker::Action::AutoConvert, "prefix_clt_autoconvert");
+    expect(auto_tracker.on_key(key_event('T', en)) == TextTracker::Action::DiscardUndo, "prefix_clt_waits_for_space");
     expect_eq(auto_tracker.current_word(), L"clt", "prefix_clt_keeps_full_word");
     expect_eq(auto_tracker.converted_word(), L"сде", "prefix_clt_converted");
+    expect(auto_tracker.on_key(key_event('K', en)) == TextTracker::Action::DiscardUndo, "prefix_cltk");
+    expect(auto_tracker.on_key(key_event('F', en)) == TextTracker::Action::DiscardUndo, "prefix_cltkf");
+    expect(auto_tracker.on_key(key_event('Q', en)) == TextTracker::Action::DiscardUndo, "prefix_cltkfq");
+    expect(auto_tracker.on_key(key_event(VK_SPACE, en)) == TextTracker::Action::AutoConvert, "space_autoconvert_sdelay");
 
-    if (en != nullptr) {
-        UnloadKeyboardLayout(en);
+    TextTracker hyphen_tracker(auto_config);
+    const UINT chto_keys[] = {'X', 'N', 'J', VK_OEM_MINUS, 'N', 'J'};
+    TextTracker::Action last = TextTracker::Action::None;
+    for (UINT vk : chto_keys) {
+        last = hyphen_tracker.on_key(key_event(vk, en));
     }
-    if (ru != nullptr) {
-        UnloadKeyboardLayout(ru);
-    }
+    expect(last == TextTracker::Action::DiscardUndo, "hyphen_word_waits_for_space");
+    expect_eq(hyphen_tracker.current_word(), L"xnj-nj", "hyphen_word_kept");
+    expect_eq(hyphen_tracker.converted_word(), L"что-то", "hyphen_word_converted");
+    expect(hyphen_tracker.on_key(key_event(VK_SPACE, en)) == TextTracker::Action::AutoConvert,
+           "space_autoconvert_chto_to");
+
+    TextTracker hotkey_tracker(auto_config);
+    expect(hotkey_tracker.on_key(key_event(VK_PAUSE, en)) == TextTracker::Action::ConvertSelection,
+           "pause_without_word_converts_selection");
+    auto selection_hotkey = key_event(VK_PAUSE, en);
+    selection_hotkey.ctrl = true;
+    expect(hotkey_tracker.on_key(selection_hotkey) == TextTracker::Action::ConvertSelection,
+           "ctrl_pause_converts_selection");
+    expect(hotkey_tracker.on_key(key_event('C', en)) == TextTracker::Action::DiscardUndo, "hotkey_then_type");
+    expect(hotkey_tracker.on_key(key_event(VK_PAUSE, en)) == TextTracker::Action::ConvertWord,
+           "pause_with_word_converts_word");
 
     if (g_failed != 0) {
         std::cerr << g_failed << " test(s) failed\n";

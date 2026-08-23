@@ -197,15 +197,8 @@ bool FocusGuard::uses_async_input(HWND window) {
                            ? info.hwndFocus
                            : window;
 
-    if (is_win32_text_control(focus) || is_win32_text_control(window)) {
-        return false;
-    }
     if (is_console_window(window) || is_console_window(focus)) {
         return false;
-    }
-    if (process_uses_async_input(pid) || chromium_in_owner_chain(window) ||
-        chromium_in_owner_chain(focus)) {
-        return true;
     }
 
     const std::wstring file = process_file_name(pid);
@@ -213,5 +206,23 @@ bool FocusGuard::uses_async_input(HWND window) {
         return false;
     }
 
-    return true;
+    const std::wstring focus_class = window_class_lowered(focus);
+    const std::wstring window_class = window_class_lowered(window);
+    // Win11 Notepad hosts RichEditD2DPT. It matches "richedit" but paints on the
+    // compositor thread: Unicode SendInput coalesces to the last glyph (аааааа).
+    if (file == L"notepad.exe" || focus_class.find(L"richeditd2d") != std::wstring::npos ||
+        window_class.find(L"richeditd2d") != std::wstring::npos) {
+        return true;
+    }
+
+    if (is_win32_text_control(focus) || is_win32_text_control(window)) {
+        return false;
+    }
+
+    if (process_uses_async_input(pid) || chromium_in_owner_chain(window) ||
+        chromium_in_owner_chain(focus)) {
+        return true;
+    }
+
+    return false;
 }

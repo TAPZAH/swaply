@@ -16,6 +16,7 @@
 #include "text_tracker.h"
 #include "translator.h"
 #include "tray_icon.h"
+#include "version.h"
 
 #include <algorithm>
 #include <stdexcept>
@@ -97,7 +98,7 @@ public:
         hwnd_ = CreateWindowExW(
             WS_EX_TOOLWINDOW,
             class_name,
-            L"wxneur 0.97 beta",
+            L"wxneur " WXNEUR_VERSION_STRW,
             WS_POPUP,
             0,
             0,
@@ -182,6 +183,7 @@ void apply_runtime_config(AppState& state) {
     LayoutDetector::set_exceptions(state.config->exceptions);
     if (state.hook != nullptr) {
         state.hook->set_enabled(state.config->enabled);
+        state.hook->set_eat_delimiters(state.config->enabled && state.config->auto_switch);
         state.hook->set_hotkeys(
             state.config->convert_word.pack(),
             state.config->convert_selection.pack(),
@@ -298,7 +300,7 @@ void convert_current_word(AppState& state, bool auto_convert) {
     const auto source = tracker.source_layout();
     const auto target = Translator::opposite(source);
     const UINT terminator = auto_convert ? tracker.terminator() : 0;
-    const std::size_t delete_count = word.size() + (terminator != 0 ? 1 : 0);
+    const std::size_t delete_count = word.size();
 
     if (converted != word) {
         if (!InputSimulator::replace_text(target_window, delete_count, converted, terminator)) {
@@ -328,8 +330,20 @@ void drain_key_queue(AppState& state) {
     state.hook->begin_drain();
     bool deferred_auto_convert = false;
     HookManager::KeyEvent event{};
+    const auto is_swallowed_delimiter = [](const HookManager::KeyEvent& key) {
+        if (key.wparam != WM_KEYDOWN && key.wparam != WM_SYSKEYDOWN) {
+            return false;
+        }
+        if (key.ctrl || key.alt || key.win || key.shift) {
+            return false;
+        }
+        const UINT vk = key.info.vkCode;
+        return vk == VK_SPACE || vk == VK_RETURN || vk == VK_TAB;
+    };
+
     while (state.hook->try_pop(event)) {
-        switch (state.tracker->on_key(event)) {
+        const auto action = state.tracker->on_key(event);
+        switch (action) {
         case TextTracker::Action::ConvertWord:
             convert_current_word(state, false);
             break;
@@ -352,13 +366,25 @@ void drain_key_queue(AppState& state) {
             learn_current_word(state);
             break;
         case TextTracker::Action::Undo:
-            undo_last_conversion(state);
+            if (state.last.valid) {
+                undo_last_conversion(state);
+            } else {
+                InputSimulator::convert_selection();
+                state.last.clear();
+                if (state.tracker != nullptr) {
+                    state.tracker->clear();
+                }
+            }
             break;
         case TextTracker::Action::DiscardUndo:
             state.last.clear();
             break;
         case TextTracker::Action::None:
             break;
+        }
+        if (is_swallowed_delimiter(event) && action != TextTracker::Action::AutoConvert &&
+            state.config != nullptr && state.config->enabled && state.config->auto_switch) {
+            InputSimulator::send_virtual_key(event.info.vkCode);
         }
     }
 
@@ -378,6 +404,7 @@ bool handle_command(AppState& state, HWND hwnd, WPARAM wparam) {
         state.config->save();
         if (state.hook != nullptr) {
             state.hook->set_enabled(state.config->enabled);
+            state.hook->set_eat_delimiters(state.config->enabled && state.config->auto_switch);
         }
         sync_tray(state);
         if (state.tracker != nullptr) {
@@ -388,6 +415,9 @@ bool handle_command(AppState& state, HWND hwnd, WPARAM wparam) {
     case TrayIcon::auto_switch_command_id:
         state.config->auto_switch = !state.config->auto_switch;
         state.config->save();
+        if (state.hook != nullptr) {
+            state.hook->set_eat_delimiters(state.config->enabled && state.config->auto_switch);
+        }
         sync_tray(state);
         return true;
     case TrayIcon::undo_command_id:
@@ -494,6 +524,7 @@ int run(HINSTANCE instance) {
     state.tracker = &tracker;
     state.taskbar_created = RegisterWindowMessageW(L"TaskbarCreated");
     InputSimulator::set_owner_window(window.get());
+    InputSimulator::restore_system_layouts();
     apply_runtime_config(state);
     SetWindowLongPtrW(window.get(), GWLP_USERDATA, reinterpret_cast<LONG_PTR>(&state));
 

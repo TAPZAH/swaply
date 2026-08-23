@@ -42,7 +42,7 @@ CAPTION "О программе"
 FONT 9, "Segoe UI", 400, 0, 0x1
 BEGIN
     ICON IDI_APPICON, -1, 12, 12, 20, 20
-    LTEXT "wxneur 0.97 beta", -1, 44, 12, 220, 12
+    LTEXT "wxneur 0.98 beta", -1, 44, 12, 220, 12
     LTEXT "Автор: Tap3ah", -1, 44, 26, 220, 10
     LTEXT "Автоматический переключатель раскладки EN/RU для Windows.", -1, 12, 48, 256, 18
     LTEXT "Лицензия: GNU GPL версии 3 или более поздней", -1, 12, 70, 256, 10
@@ -106,7 +106,7 @@ BEGIN
     EDITTEXT IDC_EDIT_EXCEPTIONS, 12, 304, 336, 36, ES_MULTILINE | ES_WANTRETURN | ES_AUTOVSCROLL | WS_VSCROLL | WS_TABSTOP
     LTEXT "Встроенные правила xneur: http, ftp, www, IP, MAC, .рф, частицы а/в/и/к/ну/о/у/я.", -1, 12, 344, 336, 10
 
-    LTEXT "wxneur 0.97 beta · автор Tap3ah · GNU GPL v3+", -1, 12, 366, 230, 10
+    LTEXT "wxneur 0.98 beta · автор Tap3ah · GNU GPL v3+", -1, 12, 366, 230, 10
     DEFPUSHBUTTON "ОК", IDOK, 248, 364, 50, 14
     PUSHBUTTON "Отмена", IDCANCEL, 302, 364, 50, 14
 END

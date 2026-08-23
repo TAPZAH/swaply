@@ -79,11 +79,6 @@ TextTracker::Action TextTracker::on_key(const HookManager::KeyEvent& event) {
         return Action::None;
     }
 
-    if (config_ != nullptr && FocusGuard::should_ignore(*config_)) {
-        clear();
-        return Action::None;
-    }
-
     const UINT vk = event.info.vkCode;
     if (config_ != nullptr) {
         const auto matches = [&](const Hotkey& key) {
@@ -98,17 +93,23 @@ TextTracker::Action TextTracker::on_key(const HookManager::KeyEvent& event) {
             if (matches(config_->undo_conversion)) {
                 return Action::Undo;
             }
-            if (matches(config_->convert_selection)) {
+            if (matches(config_->convert_selection) ||
+                (matches(config_->convert_word) && glyphs_.empty())) {
                 return Action::ConvertSelection;
             }
             if (matches(config_->learn_word) && !glyphs_.empty()) {
                 return Action::LearnWord;
             }
             if (matches(config_->convert_word)) {
-                return glyphs_.empty() ? Action::Undo : Action::ConvertWord;
+                return Action::ConvertWord;
             }
             return Action::None;
         }
+    }
+
+    if (config_ != nullptr && FocusGuard::should_ignore(*config_)) {
+        clear();
+        return Action::None;
     }
 
     if (is_key_up(event.wparam) || is_modifier(vk)) {
@@ -142,8 +143,13 @@ TextTracker::Action TextTracker::on_key(const HookManager::KeyEvent& event) {
         return Action::DiscardUndo;
     }
 
-    const auto layout = Translator::detect_layout(
+    auto layout = Translator::detect_layout(
         event.layout != nullptr ? event.layout : GetKeyboardLayout(event.target_thread));
+    if (layout == Translator::Layout::Other ||
+        FocusGuard::uses_async_input(event.target_window)) {
+        layout = Translator::Layout::En;
+    }
+
     const auto ch = Translator::char_from_vk(vk, event.shift, event.caps, layout);
     if (!ch.has_value()) {
         clear();
@@ -155,17 +161,6 @@ TextTracker::Action TextTracker::on_key(const HookManager::KeyEvent& event) {
             target_window_ = event.target_window;
         }
         glyphs_.push_back(Glyph{*ch, vk, event.shift, event.caps, layout});
-    }
-
-    if (config_ != nullptr && config_->auto_switch) {
-        const std::size_t min_length = config_->min_word_length;
-        if (LayoutDetector::should_switch(current_word(), converted_word(), source_layout(), min_length)) {
-            if (FocusGuard::uses_async_input(event.target_window)) {
-                return Action::DiscardUndo;
-            }
-            terminator_ = 0;
-            return Action::AutoConvert;
-        }
     }
 
     return Action::DiscardUndo;
@@ -234,6 +229,22 @@ Translator::Layout TextTracker::source_layout() const {
         return Translator::Layout::En;
     }
 
+    const auto inferred = Translator::infer_layout(current_word());
+    if (inferred == Translator::Layout::En || inferred == Translator::Layout::Ru) {
+        int latin = 0;
+        int cyrillic = 0;
+        for (const auto& glyph : glyphs_) {
+            const wchar_t ch = glyph.ch;
+            const bool is_latin = (ch >= L'A' && ch <= L'Z') || (ch >= L'a' && ch <= L'z');
+            const bool is_cyrillic = ch >= 0x0400 && ch <= 0x04FF;
+            latin += static_cast<int>(is_latin);
+            cyrillic += static_cast<int>(is_cyrillic);
+        }
+        if (latin != cyrillic) {
+            return latin > cyrillic ? Translator::Layout::En : Translator::Layout::Ru;
+        }
+    }
+
     const auto count_layout = [&](Translator::Layout layout) {
         return std::count_if(glyphs_.begin(), glyphs_.end(), [&](const Glyph& glyph) {
             return glyph.layout == layout;
@@ -243,9 +254,7 @@ Translator::Layout TextTracker::source_layout() const {
     const auto ru_count = count_layout(Translator::Layout::Ru);
     if (en_count == ru_count) {
         const auto first = glyphs_.front().layout;
-        return first == Translator::Layout::Other
-                   ? Translator::infer_layout(current_word())
-                   : first;
+        return first == Translator::Layout::Other ? inferred : first;
     }
     return en_count > ru_count
                ? Translator::Layout::En

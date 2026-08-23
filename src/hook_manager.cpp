@@ -66,6 +66,10 @@ void HookManager::set_enabled(bool enabled) noexcept {
     enabled_.store(enabled, std::memory_order_relaxed);
 }
 
+void HookManager::set_eat_delimiters(bool eat) noexcept {
+    eat_delimiters_.store(eat, std::memory_order_relaxed);
+}
+
 void HookManager::set_hotkeys(UINT convert_word, UINT convert_selection, UINT learn_word, UINT undo) noexcept {
     convert_hotkey_.store(convert_word, std::memory_order_relaxed);
     selection_hotkey_.store(convert_selection, std::memory_order_relaxed);
@@ -140,6 +144,14 @@ HookManager::KeyEvent HookManager::snapshot(WPARAM wparam, const KBDLLHOOKSTRUCT
     event.target_window = GetForegroundWindow();
     if (event.target_window != nullptr) {
         event.target_thread = GetWindowThreadProcessId(event.target_window, nullptr);
+        GUITHREADINFO gui{};
+        gui.cbSize = sizeof(gui);
+        if (GetGUIThreadInfo(event.target_thread, &gui) && gui.hwndFocus != nullptr) {
+            DWORD focus_thread = GetWindowThreadProcessId(gui.hwndFocus, nullptr);
+            if (focus_thread != 0) {
+                event.target_thread = focus_thread;
+            }
+        }
     }
     event.layout = GetKeyboardLayout(event.target_thread);
     event.shift = GetKeyState(VK_SHIFT) < 0;
@@ -157,6 +169,14 @@ LRESULT CALLBACK HookManager::keyboard_proc(int code, WPARAM wparam, LPARAM lpar
             const KeyEvent event = snapshot(wparam, info);
             instance_->enqueue(event);
             if (instance_->enabled_.load(std::memory_order_relaxed) && instance_->matches_hotkey(event)) {
+                return 1;
+            }
+            // Like Punto: hold space/Enter/Tab until the word is converted, then inject it.
+            const bool delimiter = info.vkCode == VK_SPACE || info.vkCode == VK_RETURN ||
+                                   info.vkCode == VK_TAB;
+            if (delimiter && instance_->eat_delimiters_.load(std::memory_order_relaxed) &&
+                instance_->enabled_.load(std::memory_order_relaxed) && !event.ctrl && !event.alt &&
+                !event.win && !event.shift) {
                 return 1;
             }
         }

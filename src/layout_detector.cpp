@@ -2,8 +2,10 @@
 
 #include "word_index.h"
 
+#include <algorithm>
 #include <string>
 #include <unordered_set>
+#include <vector>
 
 namespace {
 
@@ -596,7 +598,45 @@ bool LayoutDetector::is_exception_word(std::wstring_view text, Translator::Layou
     return matches_user_exception(text) || matches_xneur_exception(text, layout);
 }
 
-bool LayoutDetector::should_switch(
+namespace {
+
+[[nodiscard]] bool is_hyphen(wchar_t ch) noexcept {
+    return ch == L'-' || ch == L'\u2013' || ch == L'\u2014';
+}
+
+[[nodiscard]] std::vector<std::wstring_view> split_hyphen(std::wstring_view text) {
+    std::vector<std::wstring_view> parts;
+    std::size_t start = 0;
+    for (std::size_t i = 0; i < text.size(); ++i) {
+        if (!is_hyphen(text[i])) {
+            continue;
+        }
+        if (i > start) {
+            parts.push_back(text.substr(start, i - start));
+        }
+        start = i + 1;
+    }
+    if (start < text.size()) {
+        parts.push_back(text.substr(start));
+    }
+    return parts;
+}
+
+[[nodiscard]] bool looks_like_inflected_word(const std::wstring& core, Translator::Layout layout) {
+    if (core.size() < 6) {
+        return false;
+    }
+    std::size_t stem = std::min(core.size(), static_cast<std::size_t>(8));
+    while (stem >= 6) {
+        if (is_dictionary_prefix(core.substr(0, stem), layout)) {
+            return true;
+        }
+        --stem;
+    }
+    return false;
+}
+
+[[nodiscard]] bool should_switch_atom(
     std::wstring_view typed,
     std::wstring_view converted,
     Translator::Layout source,
@@ -605,7 +645,7 @@ bool LayoutDetector::should_switch(
         source = Translator::infer_layout(typed);
     }
 
-    if (is_technical_token(typed) || is_technical_token(converted)) {
+    if (LayoutDetector::is_technical_token(typed) || LayoutDetector::is_technical_token(converted)) {
         return false;
     }
 
@@ -630,7 +670,8 @@ bool LayoutDetector::should_switch(
     }
 
     const bool typed_known = is_known(typed_core, source);
-    const bool converted_known = is_known(converted_core, target);
+    const bool converted_known = is_known(converted_core, target) ||
+                                 looks_like_inflected_word(converted_core, target);
     if (typed_known) {
         return false;
     }
@@ -639,7 +680,8 @@ bool LayoutDetector::should_switch(
     }
 
     const bool typed_prefix = is_dictionary_prefix(typed_core, source);
-    const bool converted_prefix = is_dictionary_prefix(converted_core, target);
+    const bool converted_prefix = is_dictionary_prefix(converted_core, target) ||
+                                  looks_like_inflected_word(converted_core, target);
     if (typed_core.size() >= min_length) {
         if (typed_prefix && !converted_prefix) {
             return false;
@@ -657,5 +699,43 @@ bool LayoutDetector::should_switch(
 
     const int typed_hits = proto_hits(typed_proto, source);
     const int converted_hits = proto_hits(converted_proto, target);
+    if (typed_core.size() >= 8 && typed_hits >= 1 && converted_hits == 0) {
+        return true;
+    }
     return typed_hits >= 2 && converted_hits == 0;
+}
+
+}  // namespace
+
+bool LayoutDetector::should_switch(
+    std::wstring_view typed,
+    std::wstring_view converted,
+    Translator::Layout source,
+    std::size_t min_length) {
+    if (should_switch_atom(typed, converted, source, min_length)) {
+        return true;
+    }
+
+    const auto typed_parts = split_hyphen(typed);
+    const auto converted_parts = split_hyphen(converted);
+    if (typed_parts.size() < 2 || typed_parts.size() != converted_parts.size()) {
+        return false;
+    }
+
+    bool any_switch = false;
+    for (std::size_t i = 0; i < typed_parts.size(); ++i) {
+        const std::wstring typed_core = letter_core(typed_parts[i]);
+        if (typed_core.empty()) {
+            continue;
+        }
+        if (is_known(typed_core, source == Translator::Layout::Other
+                                     ? Translator::infer_layout(typed)
+                                     : source)) {
+            return false;
+        }
+        if (should_switch_atom(typed_parts[i], converted_parts[i], source, min_length)) {
+            any_switch = true;
+        }
+    }
+    return any_switch;
 }

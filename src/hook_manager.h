@@ -34,6 +34,7 @@ public:
 
     void uninstall() noexcept;
     void set_enabled(bool enabled) noexcept;
+    void set_eat_delimiters(bool eat) noexcept;
     void set_hotkeys(UINT convert_word, UINT convert_selection, UINT learn_word, UINT undo) noexcept;
     void begin_drain() noexcept;
     [[nodiscard]] bool try_pop(KeyEvent& out);
@@ -53,6 +54,7 @@ private:
     HHOOK keyboard_hook_ = nullptr;
     HHOOK mouse_hook_ = nullptr;
     std::atomic<bool> enabled_{true};
+    std::atomic<bool> eat_delimiters_{true};
     std::atomic<UINT> convert_hotkey_{0};
     std::atomic<UINT> selection_hotkey_{0};
     std::atomic<UINT> learn_hotkey_{0};

@@ -62,6 +62,10 @@ HookManager::~HookManager() {
     uninstall();
 }
 
+void HookManager::set_enabled(bool enabled) noexcept {
+    enabled_.store(enabled, std::memory_order_relaxed);
+}
+
 void HookManager::set_hotkeys(UINT convert_word, UINT convert_selection, UINT learn_word, UINT undo) noexcept {
     convert_hotkey_.store(convert_word, std::memory_order_relaxed);
     selection_hotkey_.store(convert_selection, std::memory_order_relaxed);
@@ -99,19 +103,33 @@ bool HookManager::try_pop(KeyEvent& out) {
     return true;
 }
 
+void HookManager::begin_drain() noexcept {
+    std::lock_guard lock(mutex_);
+    notification_pending_ = false;
+}
+
+bool HookManager::has_pending_events() const {
+    std::lock_guard lock(mutex_);
+    return !queue_.empty();
+}
+
 void HookManager::enqueue(const KeyEvent& event) {
     bool notify = false;
     {
         std::lock_guard lock(mutex_);
-        notify = queue_.empty();
         if (queue_.size() >= kMaxQueuedEvents) {
             queue_.pop_front();
         }
         queue_.push_back(event);
+        if (!notification_pending_) {
+            notification_pending_ = true;
+            notify = true;
+        }
     }
 
-    if (notify) {
-        PostMessageW(notify_window_, queue_message, 0, 0);
+    if (notify && !PostMessageW(notify_window_, queue_message, 0, 0)) {
+        std::lock_guard lock(mutex_);
+        notification_pending_ = false;
     }
 }
 
@@ -119,6 +137,11 @@ HookManager::KeyEvent HookManager::snapshot(WPARAM wparam, const KBDLLHOOKSTRUCT
     KeyEvent event{};
     event.wparam = wparam;
     event.info = info;
+    event.target_window = GetForegroundWindow();
+    if (event.target_window != nullptr) {
+        event.target_thread = GetWindowThreadProcessId(event.target_window, nullptr);
+    }
+    event.layout = GetKeyboardLayout(event.target_thread);
     event.shift = GetKeyState(VK_SHIFT) < 0;
     event.ctrl = GetKeyState(VK_CONTROL) < 0;
     event.alt = GetKeyState(VK_MENU) < 0;
@@ -133,7 +156,7 @@ LRESULT CALLBACK HookManager::keyboard_proc(int code, WPARAM wparam, LPARAM lpar
         if (!is_injected_key(info)) {
             const KeyEvent event = snapshot(wparam, info);
             instance_->enqueue(event);
-            if (instance_->matches_hotkey(event)) {
+            if (instance_->enabled_.load(std::memory_order_relaxed) && instance_->matches_hotkey(event)) {
                 return 1;
             }
         }

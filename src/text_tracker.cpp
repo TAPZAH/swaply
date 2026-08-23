@@ -57,16 +57,6 @@ namespace {
     }
 }
 
-[[nodiscard]] HKL foreground_layout() noexcept {
-    HWND foreground = GetForegroundWindow();
-    if (foreground == nullptr) {
-        return GetKeyboardLayout(0);
-    }
-
-    const DWORD thread_id = GetWindowThreadProcessId(foreground, nullptr);
-    return GetKeyboardLayout(thread_id);
-}
-
 [[nodiscard]] std::wstring join_glyphs(const std::vector<TextTracker::Glyph>& glyphs) {
     std::wstring text;
     text.reserve(glyphs.size());
@@ -81,6 +71,10 @@ namespace {
 TextTracker::TextTracker(AppConfig& config) : config_(&config) {}
 
 TextTracker::Action TextTracker::on_key(const HookManager::KeyEvent& event) {
+    if (!glyphs_.empty() && event.target_window != target_window_) {
+        clear();
+    }
+
     if (config_ != nullptr && !config_->enabled) {
         return Action::None;
     }
@@ -148,7 +142,8 @@ TextTracker::Action TextTracker::on_key(const HookManager::KeyEvent& event) {
         return Action::DiscardUndo;
     }
 
-    const auto layout = Translator::detect_layout(foreground_layout());
+    const auto layout = Translator::detect_layout(
+        event.layout != nullptr ? event.layout : GetKeyboardLayout(event.target_thread));
     const auto ch = Translator::char_from_vk(vk, event.shift, event.caps, layout);
     if (!ch.has_value()) {
         clear();
@@ -156,12 +151,18 @@ TextTracker::Action TextTracker::on_key(const HookManager::KeyEvent& event) {
     }
 
     if (glyphs_.size() < max_word_length) {
+        if (glyphs_.empty()) {
+            target_window_ = event.target_window;
+        }
         glyphs_.push_back(Glyph{*ch, vk, event.shift, event.caps, layout});
     }
 
     if (config_ != nullptr && config_->auto_switch) {
         const std::size_t min_length = config_->min_word_length;
         if (LayoutDetector::should_switch(current_word(), converted_word(), source_layout(), min_length)) {
+            if (FocusGuard::uses_async_input(event.target_window)) {
+                return Action::DiscardUndo;
+            }
             terminator_ = 0;
             return Action::AutoConvert;
         }
@@ -173,15 +174,20 @@ TextTracker::Action TextTracker::on_key(const HookManager::KeyEvent& event) {
 void TextTracker::clear() noexcept {
     glyphs_.clear();
     terminator_ = 0;
+    target_window_ = nullptr;
 }
 
 void TextTracker::assign_converted(std::wstring_view converted) {
+    if (converted.size() != glyphs_.size()) {
+        clear();
+        return;
+    }
+
     std::vector<Glyph> next;
     next.reserve(converted.size());
 
     const auto target = Translator::opposite(source_layout());
-    const auto limit = std::min(converted.size(), glyphs_.size());
-    for (std::size_t i = 0; i < limit; ++i) {
+    for (std::size_t i = 0; i < converted.size(); ++i) {
         Glyph glyph = glyphs_[i];
         glyph.ch = converted[i];
         glyph.layout = target;
@@ -198,22 +204,50 @@ std::wstring TextTracker::current_word() const {
 std::wstring TextTracker::converted_word() const {
     std::wstring text;
     text.reserve(glyphs_.size());
+    const auto target = Translator::opposite(source_layout());
 
     for (const auto& glyph : glyphs_) {
         const auto converted = Translator::char_from_vk(
             glyph.vk,
             glyph.shift,
             glyph.caps,
-            Translator::opposite(glyph.layout));
+            target);
         text.push_back(converted.value_or(glyph.ch));
     }
 
     return text;
 }
 
-Translator::Layout TextTracker::source_layout() const noexcept {
+bool TextTracker::should_auto_convert() const {
+    if (glyphs_.empty() || config_ == nullptr || !config_->auto_switch) {
+        return false;
+    }
+    return LayoutDetector::should_switch(
+        current_word(),
+        converted_word(),
+        source_layout(),
+        config_->min_word_length);
+}
+
+Translator::Layout TextTracker::source_layout() const {
     if (glyphs_.empty()) {
         return Translator::Layout::En;
     }
-    return glyphs_.front().layout;
+
+    const auto count_layout = [&](Translator::Layout layout) {
+        return std::count_if(glyphs_.begin(), glyphs_.end(), [&](const Glyph& glyph) {
+            return glyph.layout == layout;
+        });
+    };
+    const auto en_count = count_layout(Translator::Layout::En);
+    const auto ru_count = count_layout(Translator::Layout::Ru);
+    if (en_count == ru_count) {
+        const auto first = glyphs_.front().layout;
+        return first == Translator::Layout::Other
+                   ? Translator::infer_layout(current_word())
+                   : first;
+    }
+    return en_count > ru_count
+               ? Translator::Layout::En
+               : Translator::Layout::Ru;
 }

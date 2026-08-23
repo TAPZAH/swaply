@@ -48,15 +48,40 @@ constexpr wchar_t kRunValue[] = L"wxneur";
     return text;
 }
 
-void write_utf8_file(const std::wstring& path, std::string_view text) {
-    HANDLE file = CreateFileW(path.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+[[nodiscard]] bool write_utf8_file(const std::wstring& path, std::string_view text) {
+    const std::wstring temporary = path + L".tmp";
+    HANDLE file = CreateFileW(
+        temporary.c_str(),
+        GENERIC_WRITE,
+        0,
+        nullptr,
+        CREATE_ALWAYS,
+        FILE_ATTRIBUTE_NORMAL,
+        nullptr);
     if (file == INVALID_HANDLE_VALUE) {
-        return;
+        return false;
     }
 
     DWORD written = 0;
-    WriteFile(file, text.data(), static_cast<DWORD>(text.size()), &written, nullptr);
-    CloseHandle(file);
+    const bool complete =
+        text.size() <= MAXDWORD &&
+        WriteFile(file, text.data(), static_cast<DWORD>(text.size()), &written, nullptr) != FALSE &&
+        written == text.size() &&
+        FlushFileBuffers(file) != FALSE;
+    const bool closed = CloseHandle(file) != FALSE;
+    if (!complete || !closed) {
+        DeleteFileW(temporary.c_str());
+        return false;
+    }
+
+    if (!MoveFileExW(
+            temporary.c_str(),
+            path.c_str(),
+            MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) {
+        DeleteFileW(temporary.c_str());
+        return false;
+    }
+    return true;
 }
 
 void skip_ws(std::string_view text, std::size_t& i) {
@@ -355,43 +380,70 @@ void write_string_array(std::ostringstream& ss, const char* key, const std::vect
     return path;
 }
 
+[[nodiscard]] std::wstring exe_dir() {
+    const std::wstring exe = exe_path();
+    const auto slash = exe.find_last_of(L"\\/");
+    if (slash == std::wstring::npos) {
+        return {};
+    }
+    return exe.substr(0, slash);
+}
+
+[[nodiscard]] bool file_exists(const std::wstring& path) {
+    const DWORD attributes = GetFileAttributesW(path.c_str());
+    return attributes != INVALID_FILE_ATTRIBUTES && (attributes & FILE_ATTRIBUTE_DIRECTORY) == 0;
+}
+
 }  // namespace
 
-std::wstring config_dir() {
-    return appdata_dir();
+bool is_portable_install() {
+    const std::wstring dir = exe_dir();
+    return !dir.empty() && file_exists(dir + L"\\portable");
 }
 
 std::wstring config_path() {
-    const std::wstring dir = appdata_dir();
+    const std::wstring dir = is_portable_install() ? exe_dir() : appdata_dir();
     if (dir.empty()) {
         return {};
     }
     return dir + L'\\' + kConfigName;
 }
 
-void AppConfig::apply_autostart() const {
-    HKEY key = nullptr;
-    if (RegOpenKeyExW(HKEY_CURRENT_USER, kRunKey, 0, KEY_SET_VALUE, &key) != ERROR_SUCCESS) {
-        return;
+bool AppConfig::apply_autostart() const {
+    if (is_portable_install()) {
+        return true;
     }
 
+    HKEY key = nullptr;
+    if (RegOpenKeyExW(HKEY_CURRENT_USER, kRunKey, 0, KEY_SET_VALUE, &key) != ERROR_SUCCESS) {
+        return false;
+    }
+
+    LSTATUS status = ERROR_SUCCESS;
     if (start_with_windows) {
         const std::wstring path = exe_path();
         if (!path.empty()) {
-            const DWORD bytes = static_cast<DWORD>((path.size() + 1) * sizeof(wchar_t));
-            RegSetValueExW(
+            const std::wstring command = L'"' + path + L'"';
+            const DWORD bytes = static_cast<DWORD>((command.size() + 1) * sizeof(wchar_t));
+            status = RegSetValueExW(
                 key,
                 kRunValue,
                 0,
                 REG_SZ,
-                reinterpret_cast<const BYTE*>(path.c_str()),
+                reinterpret_cast<const BYTE*>(command.c_str()),
                 bytes);
+        } else {
+            status = ERROR_FILE_NOT_FOUND;
         }
     } else {
-        RegDeleteValueW(key, kRunValue);
+        status = RegDeleteValueW(key, kRunValue);
+        if (status == ERROR_FILE_NOT_FOUND) {
+            status = ERROR_SUCCESS;
+        }
     }
 
     RegCloseKey(key);
+    return status == ERROR_SUCCESS;
 }
 
 AppConfig AppConfig::load() {
@@ -417,14 +469,18 @@ AppConfig AppConfig::load() {
         config.save();
     }
 
-    config.start_with_windows = registry_autostart_enabled();
+    if (is_portable_install()) {
+        config.start_with_windows = false;
+    } else {
+        config.start_with_windows = registry_autostart_enabled();
+    }
     return config;
 }
 
-void AppConfig::save() const {
+bool AppConfig::save() const {
     const std::wstring path = config_path();
     if (path.empty()) {
-        return;
+        return false;
     }
 
     std::ostringstream ss;
@@ -446,5 +502,5 @@ void AppConfig::save() const {
     ss << ",\n";
     write_string_array(ss, "exceptions", exceptions);
     ss << "\n}\n";
-    write_utf8_file(path, ss.str());
+    return write_utf8_file(path, ss.str());
 }

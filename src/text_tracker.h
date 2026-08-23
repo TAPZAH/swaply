@@ -39,12 +39,15 @@ public:
 
     [[nodiscard]] std::wstring current_word() const;
     [[nodiscard]] std::wstring converted_word() const;
-    [[nodiscard]] Translator::Layout source_layout() const noexcept;
+    [[nodiscard]] Translator::Layout source_layout() const;
+    [[nodiscard]] bool should_auto_convert() const;
     [[nodiscard]] UINT terminator() const noexcept { return terminator_; }
     [[nodiscard]] bool empty() const noexcept { return glyphs_.empty(); }
+    [[nodiscard]] HWND target_window() const noexcept { return target_window_; }
 
 private:
     AppConfig* config_ = nullptr;
     std::vector<Glyph> glyphs_;
     UINT terminator_ = 0;
+    HWND target_window_ = nullptr;
 };

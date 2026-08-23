@@ -94,6 +94,87 @@ namespace {
     return false;
 }
 
+[[nodiscard]] std::wstring window_class_lowered(HWND window) {
+    if (window == nullptr) {
+        return {};
+    }
+
+    wchar_t class_name[256]{};
+    if (GetClassNameW(window, class_name, 256) == 0) {
+        return {};
+    }
+    return to_lower(class_name);
+}
+
+[[nodiscard]] bool class_looks_chromium(HWND window) {
+    const std::wstring lowered = window_class_lowered(window);
+    return lowered.find(L"chrome_") != std::wstring::npos ||
+           lowered.find(L"chromium") != std::wstring::npos ||
+           lowered.find(L"intermediate d3d") != std::wstring::npos ||
+           lowered.find(L"cef-") != std::wstring::npos;
+}
+
+[[nodiscard]] bool is_win32_text_control(HWND window) {
+    const std::wstring lowered = window_class_lowered(window);
+    if (lowered.empty()) {
+        return false;
+    }
+    return lowered == L"edit" || lowered.find(L"richedit") != std::wstring::npos ||
+           lowered.find(L"scintilla") != std::wstring::npos;
+}
+
+[[nodiscard]] bool is_console_window(HWND window) {
+    const std::wstring lowered = window_class_lowered(window);
+    return lowered.find(L"consolewindowclass") != std::wstring::npos ||
+           lowered.find(L"conhost") != std::wstring::npos;
+}
+
+[[nodiscard]] bool chromium_in_owner_chain(HWND window) {
+    HWND current = window;
+    for (int depth = 0; depth < 8 && current != nullptr; ++depth) {
+        if (class_looks_chromium(current)) {
+            return true;
+        }
+        HWND next = GetParent(current);
+        if (next == nullptr) {
+            next = GetWindow(current, GW_OWNER);
+        }
+        current = next;
+    }
+    return false;
+}
+
+[[nodiscard]] bool process_uses_async_input(DWORD pid) {
+    const std::wstring file = process_file_name(pid);
+    if (file.empty()) {
+        return false;
+    }
+    if (file == L"wxneur_tests.exe") {
+        return false;
+    }
+
+    static constexpr const wchar_t* kNeedles[] = {
+        L"cursor",
+        L"code.exe",
+        L"code - insiders.exe",
+        L"chrome.exe",
+        L"msedge.exe",
+        L"brave.exe",
+        L"discord.exe",
+        L"slack.exe",
+        L"telegram.exe",
+        L"teams.exe",
+        L"notion.exe",
+        L"electron.exe",
+    };
+    for (const wchar_t* needle : kNeedles) {
+        if (file.find(needle) != std::wstring::npos) {
+            return true;
+        }
+    }
+    return false;
+}
+
 }  // namespace
 
 bool FocusGuard::should_ignore(const AppConfig& config) {
@@ -101,4 +182,36 @@ bool FocusGuard::should_ignore(const AppConfig& config) {
         return true;
     }
     return is_excluded_process(config.excluded_processes);
+}
+
+bool FocusGuard::uses_async_input(HWND window) {
+    if (window == nullptr || !IsWindow(window)) {
+        return false;
+    }
+
+    DWORD pid = 0;
+    const DWORD thread_id = GetWindowThreadProcessId(window, &pid);
+    GUITHREADINFO info{};
+    info.cbSize = sizeof(info);
+    const HWND focus = (GetGUIThreadInfo(thread_id, &info) && info.hwndFocus != nullptr)
+                           ? info.hwndFocus
+                           : window;
+
+    if (is_win32_text_control(focus) || is_win32_text_control(window)) {
+        return false;
+    }
+    if (is_console_window(window) || is_console_window(focus)) {
+        return false;
+    }
+    if (process_uses_async_input(pid) || chromium_in_owner_chain(window) ||
+        chromium_in_owner_chain(focus)) {
+        return true;
+    }
+
+    const std::wstring file = process_file_name(pid);
+    if (file == L"wxneur_tests.exe") {
+        return false;
+    }
+
+    return true;
 }

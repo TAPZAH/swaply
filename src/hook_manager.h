@@ -14,6 +14,9 @@ public:
     struct KeyEvent {
         WPARAM wparam = 0;
         KBDLLHOOKSTRUCT info{};
+        HWND target_window = nullptr;
+        DWORD target_thread = 0;
+        HKL layout = nullptr;
         bool shift = false;
         bool ctrl = false;
         bool alt = false;
@@ -30,8 +33,11 @@ public:
     HookManager& operator=(HookManager&&) = delete;
 
     void uninstall() noexcept;
+    void set_enabled(bool enabled) noexcept;
     void set_hotkeys(UINT convert_word, UINT convert_selection, UINT learn_word, UINT undo) noexcept;
+    void begin_drain() noexcept;
     [[nodiscard]] bool try_pop(KeyEvent& out);
+    [[nodiscard]] bool has_pending_events() const;
 
 private:
     static LRESULT CALLBACK keyboard_proc(int code, WPARAM wparam, LPARAM lparam);
@@ -46,10 +52,12 @@ private:
     HWND notify_window_;
     HHOOK keyboard_hook_ = nullptr;
     HHOOK mouse_hook_ = nullptr;
+    std::atomic<bool> enabled_{true};
     std::atomic<UINT> convert_hotkey_{0};
     std::atomic<UINT> selection_hotkey_{0};
     std::atomic<UINT> learn_hotkey_{0};
     std::atomic<UINT> undo_hotkey_{0};
-    std::mutex mutex_;
+    mutable std::mutex mutex_;
     std::deque<KeyEvent> queue_;
+    bool notification_pending_ = false;
 };

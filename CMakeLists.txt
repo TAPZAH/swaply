@@ -74,6 +74,8 @@ add_executable(wxneur_tests
     src/layout_detector.cpp
     src/word_index.cpp
     src/hotkey.cpp
+    src/text_tracker.cpp
+    src/focus_guard.cpp
 )
 
 target_include_directories(wxneur_tests PRIVATE src)

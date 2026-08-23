@@ -1,8 +1,10 @@
 #include "hotkey.h"
 #include "layout_detector.h"
+#include "text_tracker.h"
 #include "translator.h"
 
 #include <iostream>
+#include <iterator>
 #include <string_view>
 
 namespace {
@@ -25,6 +27,16 @@ void expect_eq(std::wstring_view actual, std::wstring_view wanted, const char* n
         return;
     }
     std::cout << "OK   " << name << '\n';
+}
+
+HookManager::KeyEvent key_event(UINT vk, HKL layout) {
+    HookManager::KeyEvent event{};
+    event.wparam = WM_KEYDOWN;
+    event.info.vkCode = vk;
+    event.target_window = reinterpret_cast<HWND>(static_cast<uintptr_t>(0x100));
+    event.target_thread = GetCurrentThreadId();
+    event.layout = layout;
+    return event;
 }
 
 }  // namespace
@@ -76,6 +88,8 @@ int main() {
     expect(pause.vk == VK_PAUSE && !pause.ctrl && !pause.alt, "parse_pause");
     const Hotkey ctrl_pause = Hotkey::parse("Ctrl+Pause");
     expect(ctrl_pause.vk == VK_PAUSE && ctrl_pause.ctrl && !ctrl_pause.alt, "parse_ctrl_pause");
+    const Hotkey legacy_ctrl_pause = Hotkey::parse("Ctrl Pause");
+    expect(legacy_ctrl_pause.pack() == ctrl_pause.pack(), "parse_legacy_ctrl_pause");
     const Hotkey alt_f12 = Hotkey::parse("Alt+F12");
     expect(alt_f12.vk == VK_F12 && alt_f12.alt && !alt_f12.ctrl, "parse_alt_f12");
     expect(ctrl_pause.matches(VK_CANCEL, true, false, false, false), "pause_cancel_alias");
@@ -85,6 +99,41 @@ int main() {
     expect(shift_pause.to_string() == "Shift+Pause", "format_shift_pause");
     expect(Hotkey::key_name(VK_PAUSE) == L"Pause", "key_name_pause");
     expect(Hotkey::key_name('A') == L"A", "key_name_a");
+    for (const UINT vk : {VK_SCROLL, VK_CAPITAL, VK_PRIOR, VK_NEXT, VK_SNAPSHOT}) {
+        const Hotkey original{vk, true, false, true, false};
+        const Hotkey round_trip = Hotkey::parse(original.to_string());
+        expect(round_trip.pack() == original.pack(), "hotkey_multiword_round_trip");
+    }
+
+    AppConfig tracker_config{};
+    tracker_config.auto_switch = false;
+    tracker_config.ignore_password_fields = false;
+    TextTracker tracker(tracker_config);
+    const HKL en = LoadKeyboardLayoutW(L"00000409", KLF_NOTELLSHELL);
+    const HKL ru = LoadKeyboardLayoutW(L"00000419", KLF_NOTELLSHELL);
+    const UINT sdelay_keys[] = {'C', 'L', 'T', 'K', 'F', 'Q'};
+    for (std::size_t i = 0; i < std::size(sdelay_keys); ++i) {
+        static_cast<void>(tracker.on_key(key_event(sdelay_keys[i], i < 2 ? ru : en)));
+    }
+    expect(tracker.source_layout() == Translator::Layout::En, "source_layout_majority");
+    expect_eq(tracker.converted_word(), L"сделай", "mixed_layout_converts_uniformly");
+
+    AppConfig auto_config{};
+    auto_config.auto_switch = true;
+    auto_config.ignore_password_fields = false;
+    TextTracker auto_tracker(auto_config);
+    expect(auto_tracker.on_key(key_event('C', en)) == TextTracker::Action::DiscardUndo, "prefix_c");
+    expect(auto_tracker.on_key(key_event('L', en)) == TextTracker::Action::DiscardUndo, "prefix_cl");
+    expect(auto_tracker.on_key(key_event('T', en)) == TextTracker::Action::AutoConvert, "prefix_clt_autoconvert");
+    expect_eq(auto_tracker.current_word(), L"clt", "prefix_clt_keeps_full_word");
+    expect_eq(auto_tracker.converted_word(), L"сде", "prefix_clt_converted");
+
+    if (en != nullptr) {
+        UnloadKeyboardLayout(en);
+    }
+    if (ru != nullptr) {
+        UnloadKeyboardLayout(ru);
+    }
 
     if (g_failed != 0) {
         std::cerr << g_failed << " test(s) failed\n";

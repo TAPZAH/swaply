@@ -209,6 +209,9 @@ INT_PTR CALLBACK settings_proc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam
         write_hotkey(hwnd, kSelection, state->config->convert_selection);
         write_hotkey(hwnd, kLearn, state->config->learn_word);
         write_hotkey(hwnd, kUndo, state->config->undo_conversion);
+        if (is_portable_install()) {
+            EnableWindow(GetDlgItem(hwnd, IDC_CHK_AUTOSTART), FALSE);
+        }
         return TRUE;
     }
 
@@ -228,7 +231,8 @@ INT_PTR CALLBACK settings_proc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam
             state->config->enabled = get_check(hwnd, IDC_CHK_ENABLED);
             state->config->auto_switch = get_check(hwnd, IDC_CHK_AUTO);
             state->config->ignore_password_fields = get_check(hwnd, IDC_CHK_PASSWORD);
-            state->config->start_with_windows = get_check(hwnd, IDC_CHK_AUTOSTART);
+            state->config->start_with_windows =
+                !is_portable_install() && get_check(hwnd, IDC_CHK_AUTOSTART);
             state->config->convert_word = read_hotkey(hwnd, kConvert);
             state->config->convert_selection = read_hotkey(hwnd, kSelection);
             state->config->learn_word = read_hotkey(hwnd, kLearn);

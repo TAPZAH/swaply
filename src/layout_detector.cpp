@@ -220,7 +220,7 @@ constexpr const wchar_t* kRussian[] = {
     L"потому", L"почему", L"почти", L"поэтому", L"правда", L"право", L"представить",
     L"прежде", L"привет", L"прийти", L"пример", L"принять", L"проблема", L"просто",
     L"против", L"процесс", L"прямо", L"путь", L"пять", L"работа", L"работать", L"рад",
-    L"ради", L"раз", L"разве", L"развитие", L"разговор", L"рядом", L"ранний", L"ребенок",
+    L"ради", L"раз", L"разве", L"развитие", L"разговор", L"ранний", L"ребенок",
     L"результат", L"решение", L"решить", L"россия", L"рука", L"руки", L"русский",
     L"ряд", L"рядом", L"сам", L"сама", L"сами", L"самый", L"свет", L"свое", L"свой",
     L"своя", L"сделать", L"себе", L"себя", L"сегодня", L"сейчас", L"семья", L"сердце",
@@ -462,7 +462,7 @@ void ensure_indexes() {
     return contains(g_exceptions, folded) || (!core.empty() && contains(g_exceptions, core));
 }
 
-[[nodiscard]] bool is_known(const std::wstring& word, Translator::Layout layout, bool) {
+[[nodiscard]] bool is_known(const std::wstring& word, Translator::Layout layout) {
     return contains(extra_for(layout), word) || index_for(layout).contains(word);
 }
 
@@ -629,8 +629,8 @@ bool LayoutDetector::should_switch(
         return true;
     }
 
-    const bool typed_known = is_known(typed_core, source, allow_short);
-    const bool converted_known = is_known(converted_core, target, allow_short);
+    const bool typed_known = is_known(typed_core, source);
+    const bool converted_known = is_known(converted_core, target);
     if (typed_known) {
         return false;
     }

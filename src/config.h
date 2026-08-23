@@ -24,9 +24,9 @@ struct AppConfig {
     std::vector<std::string> exceptions;
 
     [[nodiscard]] static AppConfig load();
-    void save() const;
-    void apply_autostart() const;
+    bool save() const;
+    bool apply_autostart() const;
 };
 
 [[nodiscard]] std::wstring config_path();
-[[nodiscard]] std::wstring config_dir();
+[[nodiscard]] bool is_portable_install();

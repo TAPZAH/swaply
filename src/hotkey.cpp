@@ -17,7 +17,7 @@ namespace {
     if (key == "pause" || key == "break") {
         return VK_PAUSE;
     }
-    if (key == "scroll" || key == "scrolllock") {
+    if (key == "scroll" || key == "scrolllock" || key == "scroll lock") {
         return VK_SCROLL;
     }
     if (key == "insert" || key == "ins") {
@@ -34,6 +34,24 @@ namespace {
     }
     if (key == "space") {
         return VK_SPACE;
+    }
+    if (key == "backspace") {
+        return VK_BACK;
+    }
+    if (key == "tab") {
+        return VK_TAB;
+    }
+    if (key == "capslock" || key == "caps lock") {
+        return VK_CAPITAL;
+    }
+    if (key == "pageup" || key == "page up") {
+        return VK_PRIOR;
+    }
+    if (key == "pagedown" || key == "page down") {
+        return VK_NEXT;
+    }
+    if (key == "printscreen" || key == "print screen") {
+        return VK_SNAPSHOT;
     }
     if (key.size() >= 2 && (key[0] == 'f' || key[0] == 'F')) {
         int n = 0;
@@ -195,28 +213,52 @@ std::wstring Hotkey::key_name(UINT vk) {
 
 Hotkey Hotkey::parse(std::string_view text) {
     Hotkey key{};
-    std::string current;
-    for (std::size_t i = 0; i <= text.size(); ++i) {
-        const char ch = (i < text.size()) ? text[i] : '+';
-        if (ch == '+' || ch == ' ' || i == text.size()) {
-            if (!current.empty()) {
-                const std::string token = to_lower(current);
-                if (token == "ctrl" || token == "control") {
-                    key.ctrl = true;
-                } else if (token == "alt") {
-                    key.alt = true;
-                } else if (token == "shift") {
-                    key.shift = true;
-                } else if (token == "win" || token == "super") {
-                    key.win = true;
-                } else {
-                    key.vk = vk_from_name(token);
-                }
-                current.clear();
-            }
+    const auto apply_modifier = [&](std::string_view token) {
+        if (token == "ctrl" || token == "control") {
+            key.ctrl = true;
+        } else if (token == "alt") {
+            key.alt = true;
+        } else if (token == "shift") {
+            key.shift = true;
+        } else if (token == "win" || token == "super") {
+            key.win = true;
         } else {
-            current.push_back(ch);
+            return false;
         }
+        return true;
+    };
+
+    std::size_t start = 0;
+    while (start <= text.size()) {
+        const std::size_t separator = text.find('+', start);
+        const std::size_t end = separator == std::string_view::npos ? text.size() : separator;
+        std::string token(text.substr(start, end - start));
+        const auto first = token.find_first_not_of(" \t\r\n");
+        const auto last = token.find_last_not_of(" \t\r\n");
+        token = first == std::string::npos ? std::string{} : token.substr(first, last - first + 1);
+        token = to_lower(std::move(token));
+
+        while (!token.empty()) {
+            const std::size_t whitespace = token.find_first_of(" \t\r\n");
+            const std::size_t first_word_size =
+                whitespace == std::string::npos ? token.size() : whitespace;
+            const std::string_view first_word(token.data(), first_word_size);
+            if (!apply_modifier(first_word)) {
+                key.vk = vk_from_name(token);
+                break;
+            }
+            if (whitespace == std::string::npos) {
+                token.clear();
+                break;
+            }
+            const auto next = token.find_first_not_of(" \t\r\n", whitespace);
+            token = next == std::string::npos ? std::string{} : token.substr(next);
+        }
+
+        if (separator == std::string_view::npos) {
+            break;
+        }
+        start = separator + 1;
     }
     return key;
 }

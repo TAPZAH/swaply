@@ -1,5 +1,6 @@
 #include "tray_icon.h"
 
+#include "config.h"
 #include "resource.h"
 #include "version.h"
 
@@ -147,7 +148,9 @@ void TrayIcon::show_context_menu() const {
 
     const UINT enabled_flags = MF_STRING | (enabled_ ? MF_CHECKED : MF_UNCHECKED);
     const UINT auto_flags = MF_STRING | (auto_switch_ ? MF_CHECKED : MF_UNCHECKED);
-    const UINT start_flags = MF_STRING | (autostart_ ? MF_CHECKED : MF_UNCHECKED);
+    const UINT start_flags = MF_STRING |
+        (is_portable_install() ? (MF_GRAYED | MF_DISABLED) : 0) |
+        (autostart_ ? MF_CHECKED : MF_UNCHECKED);
     if (!AppendMenuW(menu.get(), enabled_flags, enabled_command_id, L"Включено") ||
         !AppendMenuW(menu.get(), auto_flags, auto_switch_command_id, L"Автопереключение") ||
         !AppendMenuW(menu.get(), start_flags, autostart_command_id, L"Запускать с Windows") ||

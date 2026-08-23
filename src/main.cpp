@@ -44,7 +44,9 @@ public:
 
     ~SingleInstance() {
         if (mutex_ != nullptr) {
-            ReleaseMutex(mutex_);
+            if (!already_running_) {
+                ReleaseMutex(mutex_);
+            }
             CloseHandle(mutex_);
         }
     }
@@ -132,12 +134,14 @@ struct LastConversion {
     Translator::Layout source = Translator::Layout::En;
     Translator::Layout target = Translator::Layout::Ru;
     UINT terminator = 0;
+    HWND window = nullptr;
     bool valid = false;
 
     void clear() noexcept {
         original.clear();
         converted.clear();
         terminator = 0;
+        window = nullptr;
         valid = false;
     }
 
@@ -177,6 +181,7 @@ void apply_runtime_config(AppState& state) {
     LayoutDetector::set_user_words(state.config->extra_en, state.config->extra_ru);
     LayoutDetector::set_exceptions(state.config->exceptions);
     if (state.hook != nullptr) {
+        state.hook->set_enabled(state.config->enabled);
         state.hook->set_hotkeys(
             state.config->convert_word.pack(),
             state.config->convert_selection.pack(),
@@ -233,7 +238,8 @@ void remember_conversion(
     std::wstring original,
     std::wstring converted,
     Translator::Layout source,
-    UINT terminator) {
+    UINT terminator,
+    HWND window) {
     if (original.empty() || original == converted) {
         state.last.clear();
         return;
@@ -244,6 +250,7 @@ void remember_conversion(
     state.last.source = source;
     state.last.target = Translator::opposite(source);
     state.last.terminator = terminator;
+    state.last.window = window;
     state.last.valid = true;
 }
 
@@ -252,8 +259,13 @@ void undo_last_conversion(AppState& state) {
         return;
     }
 
-    Sleep(15);
-    if (!InputSimulator::replace_text(state.last.delete_count(), state.last.original, state.last.terminator)) {
+    const HWND target = state.last.window != nullptr ? state.last.window : GetForegroundWindow();
+    if (target == nullptr || target != GetForegroundWindow()) {
+        state.last.clear();
+        return;
+    }
+
+    if (!InputSimulator::replace_text(target, state.last.delete_count(), state.last.original, state.last.terminator)) {
         state.last.clear();
         return;
     }
@@ -275,6 +287,12 @@ void convert_current_word(AppState& state, bool auto_convert) {
     if (word.empty()) {
         return;
     }
+    const HWND target_window = tracker.target_window();
+    if (target_window == nullptr || target_window != GetForegroundWindow()) {
+        tracker.clear();
+        state.last.clear();
+        return;
+    }
 
     const std::wstring converted = tracker.converted_word();
     const auto source = tracker.source_layout();
@@ -283,15 +301,12 @@ void convert_current_word(AppState& state, bool auto_convert) {
     const std::size_t delete_count = word.size() + (terminator != 0 ? 1 : 0);
 
     if (converted != word) {
-        if (terminator != 0) {
-            Sleep(15);
-        }
-        if (!InputSimulator::replace_text(delete_count, converted, terminator)) {
+        if (!InputSimulator::replace_text(target_window, delete_count, converted, terminator)) {
             tracker.clear();
             state.last.clear();
             return;
         }
-        remember_conversion(state, word, converted, source, terminator);
+        remember_conversion(state, word, converted, source, terminator, target_window);
     } else {
         state.last.clear();
     }
@@ -310,6 +325,8 @@ void drain_key_queue(AppState& state) {
         return;
     }
 
+    state.hook->begin_drain();
+    bool deferred_auto_convert = false;
     HookManager::KeyEvent event{};
     while (state.hook->try_pop(event)) {
         switch (state.tracker->on_key(event)) {
@@ -317,7 +334,12 @@ void drain_key_queue(AppState& state) {
             convert_current_word(state, false);
             break;
         case TextTracker::Action::AutoConvert:
-            convert_current_word(state, true);
+            if (state.tracker->terminator() == 0 && state.hook->has_pending_events()) {
+                deferred_auto_convert = true;
+            } else {
+                convert_current_word(state, true);
+                deferred_auto_convert = false;
+            }
             break;
         case TextTracker::Action::ConvertSelection:
             InputSimulator::convert_selection();
@@ -339,6 +361,10 @@ void drain_key_queue(AppState& state) {
             break;
         }
     }
+
+    if (deferred_auto_convert && state.tracker->should_auto_convert()) {
+        convert_current_word(state, true);
+    }
 }
 
 bool handle_command(AppState& state, HWND hwnd, WPARAM wparam) {
@@ -350,6 +376,9 @@ bool handle_command(AppState& state, HWND hwnd, WPARAM wparam) {
     case TrayIcon::enabled_command_id:
         state.config->enabled = !state.config->enabled;
         state.config->save();
+        if (state.hook != nullptr) {
+            state.hook->set_enabled(state.config->enabled);
+        }
         sync_tray(state);
         if (state.tracker != nullptr) {
             state.tracker->clear();
@@ -379,6 +408,9 @@ bool handle_command(AppState& state, HWND hwnd, WPARAM wparam) {
         }
         return true;
     case TrayIcon::autostart_command_id:
+        if (is_portable_install()) {
+            return true;
+        }
         state.config->start_with_windows = !state.config->start_with_windows;
         state.config->apply_autostart();
         state.config->save();
@@ -429,6 +461,7 @@ LRESULT CALLBACK hidden_wnd_proc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lpar
         if (state != nullptr && state->hook != nullptr) {
             state->hook->uninstall();
         }
+        SetWindowLongPtrW(hwnd, GWLP_USERDATA, 0);
         PostQuitMessage(0);
         return 0;
     }
@@ -452,11 +485,6 @@ int run(HINSTANCE instance) {
 
     TrayIcon tray(instance, window.get());
     HookManager hook(window.get());
-    hook.set_hotkeys(
-        config.convert_word.pack(),
-        config.convert_selection.pack(),
-        config.learn_word.pack(),
-        config.undo_conversion.pack());
     TextTracker tracker(config);
 
     AppState state{};
@@ -465,11 +493,23 @@ int run(HINSTANCE instance) {
     state.hook = &hook;
     state.tracker = &tracker;
     state.taskbar_created = RegisterWindowMessageW(L"TaskbarCreated");
-    sync_tray(state);
+    InputSimulator::set_owner_window(window.get());
+    apply_runtime_config(state);
     SetWindowLongPtrW(window.get(), GWLP_USERDATA, reinterpret_cast<LONG_PTR>(&state));
 
     MSG msg{};
-    while (GetMessageW(&msg, nullptr, 0, 0) > 0) {
+    while (true) {
+        const BOOL result = GetMessageW(&msg, nullptr, 0, 0);
+        if (result == 0) {
+            break;
+        }
+        if (result == -1) {
+            SetWindowLongPtrW(window.get(), GWLP_USERDATA, 0);
+            if (IsWindow(window.get())) {
+                DestroyWindow(window.get());
+            }
+            return 1;
+        }
         TranslateMessage(&msg);
         DispatchMessageW(&msg);
     }

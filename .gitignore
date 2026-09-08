@@ -1,5 +1,6 @@
 build/
 dist/
+PuntoSwitcher/
 .vs/
 CMakeUserPresets.json
 *.user

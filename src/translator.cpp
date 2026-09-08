@@ -151,6 +151,34 @@ Translator::Layout Translator::opposite(Layout layout) noexcept {
     return layout == Layout::Ru ? Layout::En : Layout::Ru;
 }
 
+std::optional<Translator::PhysicalKey> Translator::key_from_char(wchar_t ch, Layout layout) noexcept {
+    if (layout == Layout::Other) {
+        layout = infer_layout(std::wstring_view(&ch, 1));
+        if (layout == Layout::Other) {
+            layout = Layout::En;
+        }
+    }
+
+    for (const auto& key : kKeys) {
+        if (layout == Layout::Ru) {
+            if (key.ru == ch) {
+                return PhysicalKey{key.vk, false};
+            }
+            if (key.ru_shift == ch) {
+                return PhysicalKey{key.vk, true};
+            }
+        } else {
+            if (key.en == ch) {
+                return PhysicalKey{key.vk, false};
+            }
+            if (key.en_shift == ch) {
+                return PhysicalKey{key.vk, true};
+            }
+        }
+    }
+    return std::nullopt;
+}
+
 std::optional<wchar_t> Translator::char_from_vk(UINT vk, bool shift, bool caps, Layout layout) noexcept {
     if (layout == Layout::Other) {
         layout = Layout::En;

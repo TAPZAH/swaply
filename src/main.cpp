@@ -24,6 +24,8 @@
 #include <system_error>
 #include <utility>
 
+#include <objbase.h>
+
 namespace {
 
 constexpr wchar_t kWindowClassName[] = L"wxneur.HiddenTrayWindow";
@@ -267,12 +269,16 @@ void undo_last_conversion(AppState& state) {
         return;
     }
 
-    if (!InputSimulator::replace_text(target, state.last.delete_count(), state.last.original, state.last.terminator)) {
+    if (!InputSimulator::replace_text(
+            target,
+            state.last.delete_count(),
+            state.last.original,
+            state.last.terminator,
+            state.last.source)) {
         state.last.clear();
         return;
     }
 
-    InputSimulator::activate_layout(state.last.source);
     state.last.invert();
     if (state.tracker != nullptr) {
         state.tracker->clear();
@@ -303,7 +309,7 @@ void convert_current_word(AppState& state, bool auto_convert) {
     const std::size_t delete_count = word.size();
 
     if (converted != word) {
-        if (!InputSimulator::replace_text(target_window, delete_count, converted, terminator)) {
+        if (!InputSimulator::replace_text(target_window, delete_count, converted, terminator, target)) {
             tracker.clear();
             state.last.clear();
             return;
@@ -311,6 +317,7 @@ void convert_current_word(AppState& state, bool auto_convert) {
         remember_conversion(state, word, converted, source, terminator, target_window);
     } else {
         state.last.clear();
+        InputSimulator::activate_layout(target);
     }
 
     if (auto_convert) {
@@ -318,8 +325,6 @@ void convert_current_word(AppState& state, bool auto_convert) {
     } else {
         tracker.assign_converted(converted);
     }
-
-    InputSimulator::activate_layout(target);
 }
 
 void drain_key_queue(AppState& state) {
@@ -523,7 +528,6 @@ int run(HINSTANCE instance) {
     state.hook = &hook;
     state.tracker = &tracker;
     state.taskbar_created = RegisterWindowMessageW(L"TaskbarCreated");
-    InputSimulator::set_owner_window(window.get());
     InputSimulator::restore_system_layouts();
     apply_runtime_config(state);
     SetWindowLongPtrW(window.get(), GWLP_USERDATA, reinterpret_cast<LONG_PTR>(&state));
@@ -550,8 +554,29 @@ int run(HINSTANCE instance) {
 
 }  // namespace
 
+class ComInit {
+public:
+    ComInit() {
+        const HRESULT hr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+        initialized_ = hr == S_OK || hr == S_FALSE;
+    }
+
+    ~ComInit() {
+        if (initialized_) {
+            CoUninitialize();
+        }
+    }
+
+    ComInit(const ComInit&) = delete;
+    ComInit& operator=(const ComInit&) = delete;
+
+private:
+    bool initialized_ = false;
+};
+
 int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int) {
     try {
+        ComInit com;
         return run(instance);
     } catch (const std::exception& ex) {
         const std::string what = ex.what();

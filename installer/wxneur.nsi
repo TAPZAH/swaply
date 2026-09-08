@@ -5,8 +5,8 @@ SetCompressor /SOLID lzma
 !include "FileFunc.nsh"
 
 !define APP_NAME "wxneur"
-!define APP_VERSION "0.98 beta"
-!define APP_VERSION_FILE "0.98-beta"
+!define APP_VERSION "0.985 beta"
+!define APP_VERSION_FILE "0.985-beta"
 !define APP_PUBLISHER "Tap3ah"
 !define APP_REG "Software\${APP_NAME}"
 
@@ -33,7 +33,7 @@ ShowUninstDetails show
 !insertmacro MUI_LANGUAGE "Russian"
 !insertmacro MUI_LANGUAGE "English"
 
-VIProductVersion "0.98.0.0"
+VIProductVersion "0.985.0.0"
 VIAddVersionKey /LANG=1049 "ProductName" "${APP_NAME}"
 VIAddVersionKey /LANG=1049 "ProductVersion" "${APP_VERSION}"
 VIAddVersionKey /LANG=1049 "CompanyName" "${APP_PUBLISHER}"

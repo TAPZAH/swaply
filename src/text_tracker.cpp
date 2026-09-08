@@ -145,8 +145,7 @@ TextTracker::Action TextTracker::on_key(const HookManager::KeyEvent& event) {
 
     auto layout = Translator::detect_layout(
         event.layout != nullptr ? event.layout : GetKeyboardLayout(event.target_thread));
-    if (layout == Translator::Layout::Other ||
-        FocusGuard::uses_async_input(event.target_window)) {
+    if (layout == Translator::Layout::Other) {
         layout = Translator::Layout::En;
     }
 

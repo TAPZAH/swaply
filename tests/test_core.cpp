@@ -55,6 +55,13 @@ int main() {
     expect(Translator::char_from_vk('J', false, false, Translator::Layout::Ru) == L'о', "vk_j_ru");
     expect(Translator::opposite(Translator::Layout::En) == Translator::Layout::Ru, "opposite");
 
+    const auto key_ru_p = Translator::key_from_char(L'п', Translator::Layout::Ru);
+    expect(key_ru_p.has_value() && key_ru_p->vk == 'G' && !key_ru_p->shift, "key_from_char_ru_p");
+    const auto key_ru_P = Translator::key_from_char(L'П', Translator::Layout::Ru);
+    expect(key_ru_P.has_value() && key_ru_P->vk == 'G' && key_ru_P->shift, "key_from_char_ru_P");
+    const auto key_en_g = Translator::key_from_char(L'g', Translator::Layout::En);
+    expect(key_en_g.has_value() && key_en_g->vk == 'G' && !key_en_g->shift, "key_from_char_en_g");
+
     expect(LayoutDetector::should_switch(L"ghbdtn", L"привет", Translator::Layout::En), "auto_ru_word");
     expect(LayoutDetector::should_switch(L"руддщ", L"hello", Translator::Layout::Ru), "auto_en_word");
     expect(!LayoutDetector::should_switch(L"hello", L"руддщ", Translator::Layout::En), "keep_known_en");

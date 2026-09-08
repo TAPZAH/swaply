@@ -1,55 +1,90 @@
 #include "input_sim.h"
 
-#include "focus_guard.h"
-
 #include <Windows.h>
+#include <objbase.h>
+#include <ole2.h>
+#include <UIAutomation.h>
 
-#include <algorithm>
-#include <cstring>
-#include <iterator>
-#include <limits>
+#include <array>
 #include <optional>
 #include <string>
-#include <utility>
 #include <vector>
 
 namespace {
 
 constexpr wchar_t kEnglishLayoutId[] = L"00000409";
 constexpr wchar_t kRussianLayoutId[] = L"00000419";
-constexpr std::size_t kMaxClipboardCharacters = 1024 * 1024;
-constexpr DWORD kClipboardTimeoutMs = 750;
-constexpr DWORD kReplaceFlushTimeoutMs = 50;
+constexpr DWORD kSyncTimeoutMs = 80;
+constexpr std::size_t kMaxSelectionCharacters = 8192;
 
-HWND g_owner_window = nullptr;
+class ThreadInputAttach {
+public:
+    explicit ThreadInputAttach(DWORD thread_id) {
+        const DWORD self = GetCurrentThreadId();
+        if (thread_id != 0 && thread_id != self) {
+            attached_ = AttachThreadInput(self, thread_id, TRUE) != FALSE;
+            thread_id_ = thread_id;
+        }
+    }
 
-[[nodiscard]] bool send_key(WORD vk, DWORD extra_flags = 0);
-[[nodiscard]] wchar_t terminator_char(UINT trailing_vk) noexcept;
+    ~ThreadInputAttach() {
+        if (attached_) {
+            AttachThreadInput(GetCurrentThreadId(), thread_id_, FALSE);
+        }
+    }
 
-void append_key(std::vector<INPUT>& inputs, WORD vk, DWORD extra_flags = 0) {
-    INPUT down{};
-    down.type = INPUT_KEYBOARD;
-    down.ki.wVk = vk;
-    down.ki.wScan = static_cast<WORD>(MapVirtualKeyW(vk, MAPVK_VK_TO_VSC));
-    down.ki.dwFlags = extra_flags;
-    inputs.push_back(down);
+    ThreadInputAttach(const ThreadInputAttach&) = delete;
+    ThreadInputAttach& operator=(const ThreadInputAttach&) = delete;
 
-    INPUT up = down;
-    up.ki.dwFlags = extra_flags | KEYEVENTF_KEYUP;
-    inputs.push_back(up);
+private:
+    DWORD thread_id_ = 0;
+    bool attached_ = false;
+};
+
+[[nodiscard]] bool is_extended_key(UINT vk) noexcept {
+    switch (vk) {
+    case VK_INSERT:
+    case VK_DELETE:
+    case VK_HOME:
+    case VK_END:
+    case VK_PRIOR:
+    case VK_NEXT:
+    case VK_LEFT:
+    case VK_RIGHT:
+    case VK_UP:
+    case VK_DOWN:
+    case VK_NUMLOCK:
+    case VK_DIVIDE:
+    case VK_RCONTROL:
+    case VK_RMENU:
+        return true;
+    default:
+        return false;
+    }
 }
 
-void append_unicode(std::vector<INPUT>& inputs, wchar_t ch) {
-    INPUT down{};
-    down.type = INPUT_KEYBOARD;
-    down.ki.wVk = 0;
-    down.ki.wScan = static_cast<WORD>(ch);
-    down.ki.dwFlags = KEYEVENTF_UNICODE;
-    inputs.push_back(down);
+void append_key_event(std::vector<INPUT>& inputs, WORD vk, bool down) {
+    INPUT input{};
+    input.type = INPUT_KEYBOARD;
+    input.ki.wVk = vk;
+    input.ki.wScan = static_cast<WORD>(MapVirtualKeyW(vk, MAPVK_VK_TO_VSC));
+    input.ki.dwFlags = (down ? 0 : KEYEVENTF_KEYUP) | (is_extended_key(vk) ? KEYEVENTF_EXTENDEDKEY : 0);
+    inputs.push_back(input);
+}
 
-    INPUT up = down;
-    up.ki.dwFlags = KEYEVENTF_UNICODE | KEYEVENTF_KEYUP;
-    inputs.push_back(up);
+void append_key(std::vector<INPUT>& inputs, WORD vk) {
+    append_key_event(inputs, vk, true);
+    append_key_event(inputs, vk, false);
+}
+
+void append_character(std::vector<INPUT>& inputs, const Translator::PhysicalKey& key) {
+    if (key.shift) {
+        append_key_event(inputs, VK_SHIFT, true);
+    }
+    append_key(inputs, static_cast<WORD>(key.vk));
+    if (key.shift) {
+        append_key_event(inputs, VK_SHIFT, false);
+    }
 }
 
 [[nodiscard]] bool send_inputs(std::vector<INPUT>& inputs) {
@@ -99,178 +134,10 @@ void release_held_modifiers() {
         if (GetAsyncKeyState(vk) >= 0) {
             continue;
         }
-        INPUT up{};
-        up.type = INPUT_KEYBOARD;
-        up.ki.wVk = vk;
-        up.ki.wScan = static_cast<WORD>(MapVirtualKeyW(vk, MAPVK_VK_TO_VSC));
-        up.ki.dwFlags = KEYEVENTF_KEYUP;
-        ups.push_back(up);
+        append_key_event(ups, vk, false);
     }
     static_cast<void>(send_inputs(ups));
 }
-
-bool send_chord(WORD modifier, WORD key) {
-    release_held_modifiers();
-
-    std::vector<INPUT> inputs;
-    inputs.reserve(4);
-    INPUT down{};
-    down.type = INPUT_KEYBOARD;
-    down.ki.wVk = modifier;
-    down.ki.wScan = static_cast<WORD>(MapVirtualKeyW(modifier, MAPVK_VK_TO_VSC));
-    inputs.push_back(down);
-
-    INPUT key_down{};
-    key_down.type = INPUT_KEYBOARD;
-    key_down.ki.wVk = key;
-    key_down.ki.wScan = static_cast<WORD>(MapVirtualKeyW(key, MAPVK_VK_TO_VSC));
-    inputs.push_back(key_down);
-
-    INPUT key_up = key_down;
-    key_up.ki.dwFlags = KEYEVENTF_KEYUP;
-    inputs.push_back(key_up);
-
-    INPUT up = down;
-    up.ki.dwFlags = KEYEVENTF_KEYUP;
-    inputs.push_back(up);
-    return send_inputs(inputs);
-}
-
-class UniqueClipboard {
-public:
-    UniqueClipboard() {
-        for (int attempt = 0; attempt < 8; ++attempt) {
-            if (OpenClipboard(g_owner_window) != FALSE) {
-                open_ = true;
-                return;
-            }
-            Sleep(10);
-        }
-    }
-
-    ~UniqueClipboard() {
-        if (open_) {
-            CloseClipboard();
-        }
-    }
-
-    UniqueClipboard(const UniqueClipboard&) = delete;
-    UniqueClipboard& operator=(const UniqueClipboard&) = delete;
-
-    [[nodiscard]] explicit operator bool() const noexcept { return open_; }
-
-private:
-    bool open_ = false;
-};
-
-class LockedGlobal {
-public:
-    explicit LockedGlobal(HANDLE handle) : handle_(handle) {
-        if (handle_ != nullptr) {
-            pointer_ = GlobalLock(handle_);
-        }
-    }
-
-    ~LockedGlobal() {
-        if (pointer_ != nullptr) {
-            GlobalUnlock(handle_);
-        }
-    }
-
-    LockedGlobal(const LockedGlobal&) = delete;
-    LockedGlobal& operator=(const LockedGlobal&) = delete;
-
-    [[nodiscard]] void* get() const noexcept { return pointer_; }
-
-private:
-    HANDLE handle_ = nullptr;
-    void* pointer_ = nullptr;
-};
-
-[[nodiscard]] std::optional<std::wstring> clipboard_text() {
-    UniqueClipboard clipboard;
-    if (!clipboard) {
-        return std::nullopt;
-    }
-
-    HANDLE data = GetClipboardData(CF_UNICODETEXT);
-    if (data == nullptr) {
-        return std::nullopt;
-    }
-
-    const SIZE_T bytes = GlobalSize(data);
-    if (bytes < sizeof(wchar_t) || bytes % sizeof(wchar_t) != 0) {
-        return std::nullopt;
-    }
-    const std::size_t character_count =
-        std::min<std::size_t>(bytes / sizeof(wchar_t), kMaxClipboardCharacters + 1);
-
-    LockedGlobal lock(data);
-    const auto* text = static_cast<const wchar_t*>(lock.get());
-    if (text == nullptr) {
-        return std::nullopt;
-    }
-
-    const auto* terminator = std::find(text, text + character_count, L'\0');
-    if (terminator == text + character_count ||
-        static_cast<std::size_t>(terminator - text) > kMaxClipboardCharacters) {
-        return std::nullopt;
-    }
-    return std::wstring(text, terminator);
-}
-
-bool set_clipboard_text(std::wstring_view text) {
-    if (text.size() > (std::numeric_limits<std::size_t>::max() / sizeof(wchar_t)) - 1) {
-        return false;
-    }
-
-    const std::size_t bytes = (text.size() + 1) * sizeof(wchar_t);
-    HGLOBAL memory = GlobalAlloc(GMEM_MOVEABLE, bytes);
-    if (memory == nullptr) {
-        return false;
-    }
-
-    {
-        LockedGlobal lock(memory);
-        auto* dest = static_cast<wchar_t*>(lock.get());
-        if (dest == nullptr) {
-            GlobalFree(memory);
-            return false;
-        }
-        std::memcpy(dest, text.data(), text.size() * sizeof(wchar_t));
-        dest[text.size()] = L'\0';
-    }
-
-    UniqueClipboard clipboard;
-    if (!clipboard || !EmptyClipboard()) {
-        GlobalFree(memory);
-        return false;
-    }
-
-    if (SetClipboardData(CF_UNICODETEXT, memory) == nullptr) {
-        GlobalFree(memory);
-        return false;
-    }
-    return true;
-}
-
-class ClipboardTextRestore {
-public:
-    explicit ClipboardTextRestore(std::optional<std::wstring> backup)
-        : backup_(std::move(backup)) {}
-
-    ~ClipboardTextRestore() {
-        if (backup_.has_value()) {
-            set_clipboard_text(*backup_);
-        }
-    }
-
-    ClipboardTextRestore(const ClipboardTextRestore&) = delete;
-    ClipboardTextRestore& operator=(const ClipboardTextRestore&) = delete;
-
-private:
-    std::optional<std::wstring> backup_;
-};
 
 [[nodiscard]] HWND focused_input_window(HWND target) {
     if (target == nullptr) {
@@ -286,372 +153,190 @@ private:
     return target;
 }
 
-[[nodiscard]] bool wait_for_target_input(HWND target, DWORD timeout_ms) {
+[[nodiscard]] bool wait_for_target(HWND target) {
     if (target == nullptr) {
         return false;
     }
 
     DWORD_PTR ignored = 0;
     return SendMessageTimeoutW(
-               target,
+               focused_input_window(target),
                WM_NULL,
                0,
                0,
                SMTO_ABORTIFHUNG | SMTO_BLOCK,
-               timeout_ms,
+               kSyncTimeoutMs,
                &ignored) != 0;
 }
 
-[[nodiscard]] bool wait_for_clipboard_change(DWORD previous_sequence, HWND target) {
-    const ULONGLONG deadline = GetTickCount64() + kClipboardTimeoutMs;
-    do {
-        if (GetForegroundWindow() != target) {
+[[nodiscard]] bool append_text_keys(std::vector<INPUT>& inputs, std::wstring_view text, Translator::Layout layout) {
+    inputs.reserve(inputs.size() + text.size() * 6);
+    for (const wchar_t ch : text) {
+        const auto key = Translator::key_from_char(ch, layout);
+        if (!key.has_value()) {
             return false;
         }
-        if (GetClipboardSequenceNumber() != previous_sequence) {
-            return true;
-        }
-        Sleep(10);
-    } while (GetTickCount64() < deadline);
-    return false;
+        append_character(inputs, *key);
+    }
+    return true;
 }
 
-[[nodiscard]] bool prepare_target(HWND target, bool async_input) {
-    if (target == nullptr || target != GetForegroundWindow()) {
+bool request_layout(HWND hwnd, HKL hkl) {
+    if (hwnd == nullptr || !IsWindow(hwnd) || hkl == nullptr) {
         return false;
     }
 
-    static_cast<void>(wait_for_target_input(focused_input_window(target), kReplaceFlushTimeoutMs));
-    Sleep(async_input ? 80 : 15);
+    DWORD_PTR ignored = 0;
+    return SendMessageTimeoutW(
+               hwnd,
+               WM_INPUTLANGCHANGEREQUEST,
+               INPUTLANGCHANGE_SYSCHARSET,
+               reinterpret_cast<LPARAM>(hkl),
+               SMTO_ABORTIFHUNG | SMTO_BLOCK,
+               kSyncTimeoutMs,
+               &ignored) != 0;
+}
+
+[[nodiscard]] bool switch_layout(HWND target, Translator::Layout layout) {
+    if (layout == Translator::Layout::Other) {
+        return false;
+    }
+
+    const HKL hkl = load_layout(layout);
+    if (hkl == nullptr || target == nullptr || target != GetForegroundWindow()) {
+        return false;
+    }
+
+    HWND focus = focused_input_window(target);
+    if (focus == nullptr) {
+        focus = target;
+    }
+
+    DWORD thread_id = 0;
+    GetWindowThreadProcessId(focus, &thread_id);
+    ThreadInputAttach attach(thread_id);
+    ActivateKeyboardLayout(hkl, 0);
+    request_layout(focus, hkl);
+    if (focus != target) {
+        request_layout(target, hkl);
+    }
+    static_cast<void>(wait_for_target(target));
     return target == GetForegroundWindow();
 }
 
-[[nodiscard]] std::wstring class_name_lowered(HWND window) {
-    if (window == nullptr) {
-        return {};
-    }
-    wchar_t class_name[256]{};
-    if (GetClassNameW(window, class_name, 256) == 0) {
-        return {};
-    }
-    std::wstring lowered = class_name;
-    for (wchar_t& ch : lowered) {
-        if (ch >= L'A' && ch <= L'Z') {
-            ch = static_cast<wchar_t>(ch - L'A' + L'a');
+class UniqueAutomation {
+public:
+    UniqueAutomation() {
+        if (FAILED(CoCreateInstance(
+                CLSID_CUIAutomation,
+                nullptr,
+                CLSCTX_INPROC_SERVER,
+                IID_PPV_ARGS(&automation_)))) {
+            automation_ = nullptr;
         }
     }
-    return lowered;
-}
 
-[[nodiscard]] int text_control_score(const std::wstring& lowered) noexcept {
-    if (lowered.find(L"richeditd2d") != std::wstring::npos) {
-        return 100;
+    ~UniqueAutomation() {
+        if (automation_ != nullptr) {
+            automation_->Release();
+        }
     }
-    if (lowered == L"edit") {
-        return 90;
-    }
-    if (lowered.find(L"richedit") != std::wstring::npos) {
-        return 80;
-    }
-    if (lowered.find(L"scintilla") != std::wstring::npos) {
-        return 70;
-    }
-    if (lowered == L"notepadtextbox") {
-        return 40;
-    }
-    return 0;
-}
 
-struct FindTextControlState {
-    HWND best = nullptr;
-    int score = 0;
+    UniqueAutomation(const UniqueAutomation&) = delete;
+    UniqueAutomation& operator=(const UniqueAutomation&) = delete;
+
+    [[nodiscard]] IUIAutomation* get() const noexcept { return automation_; }
+
+private:
+    IUIAutomation* automation_ = nullptr;
 };
 
-BOOL CALLBACK find_text_control_proc(HWND hwnd, LPARAM lparam) {
-    auto* state = reinterpret_cast<FindTextControlState*>(lparam);
-    const int score = text_control_score(class_name_lowered(hwnd));
-    if (score > state->score) {
-        state->best = hwnd;
-        state->score = score;
-    }
-    return TRUE;
-}
-
-[[nodiscard]] HWND find_text_control(HWND root) {
-    if (root == nullptr) {
-        return nullptr;
+[[nodiscard]] std::optional<std::wstring> focused_selection_text() {
+    UniqueAutomation automation;
+    if (automation.get() == nullptr) {
+        return std::nullopt;
     }
 
-    HWND focus = focused_input_window(root);
-    const int focus_score = text_control_score(class_name_lowered(focus));
-    const int root_score = text_control_score(class_name_lowered(root));
-    if (focus_score >= 80) {
-        return focus;
-    }
-    if (root_score >= 80) {
-        return root;
+    IUIAutomationElement* focused = nullptr;
+    if (FAILED(automation.get()->GetFocusedElement(&focused)) || focused == nullptr) {
+        return std::nullopt;
     }
 
-    FindTextControlState state{};
-    if (focus_score > 0) {
-        state.best = focus;
-        state.score = focus_score;
-    } else if (root_score > 0) {
-        state.best = root;
-        state.score = root_score;
-    }
-    EnumChildWindows(root, find_text_control_proc, reinterpret_cast<LPARAM>(&state));
-    if (focus != nullptr && focus != root) {
-        EnumChildWindows(focus, find_text_control_proc, reinterpret_cast<LPARAM>(&state));
-    }
-    return state.best != nullptr ? state.best : focus;
-}
-
-[[nodiscard]] bool timed_message(HWND window, UINT message, WPARAM wparam, LPARAM lparam, DWORD timeout_ms = 200) {
-    DWORD_PTR ignored = 0;
-    return SendMessageTimeoutW(
-               window,
-               message,
-               wparam,
-               lparam,
-               SMTO_ABORTIFHUNG | SMTO_BLOCK,
-               timeout_ms,
-               &ignored) != 0;
-}
-
-[[nodiscard]] std::size_t edit_text_length(HWND edit) {
-    DWORD_PTR length = 0;
-    if (SendMessageTimeoutW(
-            edit,
-            WM_GETTEXTLENGTH,
-            0,
-            0,
-            SMTO_ABORTIFHUNG | SMTO_BLOCK,
-            200,
-            &length) == 0) {
-        return 0;
-    }
-    return static_cast<std::size_t>(length);
-}
-
-[[nodiscard]] bool replace_via_edit_messages(
-    HWND target,
-    std::size_t delete_count,
-    std::wstring_view text,
-    UINT trailing_vk) {
-    HWND edit = find_text_control(target);
-    if (edit == nullptr || text_control_score(class_name_lowered(edit)) == 0) {
-        return false;
+    IUIAutomationTextPattern* pattern = nullptr;
+    const HRESULT pattern_hr = focused->GetCurrentPatternAs(
+        UIA_TextPatternId, IID_PPV_ARGS(&pattern));
+    focused->Release();
+    if (FAILED(pattern_hr) || pattern == nullptr) {
+        return std::nullopt;
     }
 
-    std::wstring paste(text);
-    const wchar_t extra = terminator_char(trailing_vk);
-    if (extra == L' ' || extra == L'\t') {
-        paste.push_back(extra);
+    IUIAutomationTextRangeArray* ranges = nullptr;
+    if (FAILED(pattern->GetSelection(&ranges)) || ranges == nullptr) {
+        pattern->Release();
+        return std::nullopt;
     }
 
-    ClipboardTextRestore restore(clipboard_text());
-    if (!set_clipboard_text(paste)) {
-        return false;
-    }
-
-    const std::size_t length = edit_text_length(edit);
-    DWORD_PTR sel = 0;
-    const bool got_sel = SendMessageTimeoutW(
-                             edit,
-                             EM_GETSEL,
-                             0,
-                             0,
-                             SMTO_ABORTIFHUNG | SMTO_BLOCK,
-                             200,
-                             &sel) != 0;
-    const std::size_t caret = (got_sel && HIWORD(sel) != 0)
-                                 ? static_cast<std::size_t>(HIWORD(sel))
-                                 : length;
-    if (delete_count != 0 && caret == 0 && length == 0) {
-        return false;
-    }
-    const std::size_t actual_delete = std::min(delete_count, caret);
-    const std::size_t start = caret - actual_delete;
-    if (!timed_message(edit, EM_SETSEL, start, static_cast<LPARAM>(caret))) {
-        return false;
-    }
-    if (!timed_message(edit, WM_PASTE, 0, 0, 400)) {
-        return false;
-    }
-    Sleep(150);
-
-    if (extra == L'\n') {
-        if (!send_key(VK_RETURN)) {
-            return false;
+    int length = 0;
+    ranges->get_Length(&length);
+    std::wstring text;
+    for (int i = 0; i < length; ++i) {
+        IUIAutomationTextRange* range = nullptr;
+        if (FAILED(ranges->GetElement(i, &range)) || range == nullptr) {
+            continue;
         }
-    }
-    return GetForegroundWindow() == target;
-}
-
-[[nodiscard]] wchar_t terminator_char(UINT trailing_vk) noexcept {
-    switch (trailing_vk) {
-    case VK_SPACE:
-        return L' ';
-    case VK_RETURN:
-        return L'\n';
-    case VK_TAB:
-        return L'\t';
-    default:
-        return 0;
-    }
-}
-
-[[nodiscard]] bool send_key(WORD vk, DWORD extra_flags) {
-    std::vector<INPUT> inputs;
-    append_key(inputs, vk, extra_flags);
-    return send_inputs(inputs);
-}
-
-[[nodiscard]] bool send_modifier(WORD vk, bool down) {
-    INPUT input{};
-    input.type = INPUT_KEYBOARD;
-    input.ki.wVk = vk;
-    input.ki.wScan = static_cast<WORD>(MapVirtualKeyW(vk, MAPVK_VK_TO_VSC));
-    input.ki.dwFlags = down ? 0 : KEYEVENTF_KEYUP;
-    return SendInput(1, &input, sizeof(INPUT)) == 1;
-}
-
-[[nodiscard]] bool send_left_arrow() {
-    INPUT inputs[2]{};
-    const WORD scan = static_cast<WORD>(MapVirtualKeyW(VK_LEFT, MAPVK_VK_TO_VSC));
-    inputs[0].type = INPUT_KEYBOARD;
-    inputs[0].ki.wVk = VK_LEFT;
-    inputs[0].ki.wScan = scan;
-    inputs[0].ki.dwFlags = KEYEVENTF_EXTENDEDKEY;
-    inputs[1] = inputs[0];
-    inputs[1].ki.dwFlags = KEYEVENTF_EXTENDEDKEY | KEYEVENTF_KEYUP;
-    return SendInput(2, inputs, sizeof(INPUT)) == 2;
-}
-
-[[nodiscard]] bool select_previous_characters(std::size_t count, bool async_input) {
-    if (count == 0) {
-        return true;
-    }
-    if (!send_modifier(VK_SHIFT, true)) {
-        return false;
-    }
-
-    bool ok = true;
-    if (async_input) {
-        Sleep(20);
-    }
-
-    for (std::size_t i = 0; i < count && ok; ++i) {
-        ok = send_left_arrow();
-        if (async_input) {
-            Sleep(20);
+        BSTR chunk = nullptr;
+        if (SUCCEEDED(range->GetText(-1, &chunk)) && chunk != nullptr) {
+            text.append(chunk, SysStringLen(chunk));
+            SysFreeString(chunk);
         }
+        range->Release();
     }
 
-    const bool released = send_modifier(VK_SHIFT, false);
-    if (!released) {
-        static_cast<void>(send_modifier(VK_LSHIFT, false));
-        static_cast<void>(send_modifier(VK_RSHIFT, false));
+    ranges->Release();
+    pattern->Release();
+    if (text.empty() || text.size() > kMaxSelectionCharacters) {
+        return std::nullopt;
     }
-    return ok && released;
-}
-
-[[nodiscard]] bool replace_via_clipboard(HWND target, std::size_t delete_count, std::wstring_view text, UINT trailing_vk) {
-    std::wstring paste(text);
-    const wchar_t extra = terminator_char(trailing_vk);
-    if (extra == L' ' || extra == L'\t') {
-        paste.push_back(extra);
-    }
-
-    ClipboardTextRestore restore(clipboard_text());
-    if (!set_clipboard_text(paste)) {
-        return false;
-    }
-    if (!select_previous_characters(delete_count, true)) {
-        return false;
-    }
-    Sleep(40);
-    if (GetForegroundWindow() != target) {
-        return false;
-    }
-    if (!send_chord(VK_CONTROL, 'V')) {
-        release_held_modifiers();
-        return false;
-    }
-    static_cast<void>(wait_for_target_input(focused_input_window(target), kClipboardTimeoutMs));
-    Sleep(150);
-    release_held_modifiers();
-
-    if (extra == L'\n') {
-        if (!send_key(VK_RETURN)) {
-            return false;
-        }
-    }
-    return GetForegroundWindow() == target;
+    return text;
 }
 
 }  // namespace
-
-void InputSimulator::set_owner_window(HWND window) noexcept {
-    g_owner_window = window;
-}
-
-bool InputSimulator::replace_text(std::size_t delete_count, std::wstring_view text) {
-    return replace_text(GetForegroundWindow(), delete_count, text, 0);
-}
-
-bool InputSimulator::replace_text(std::size_t delete_count, std::wstring_view text, UINT trailing_vk) {
-    return replace_text(GetForegroundWindow(), delete_count, text, trailing_vk);
-}
 
 bool InputSimulator::replace_text(
     HWND target,
     std::size_t delete_count,
     std::wstring_view text,
-    UINT trailing_vk) {
-    const bool async_input = FocusGuard::uses_async_input(target);
-    if (!prepare_target(target, async_input)) {
+    UINT trailing_vk,
+    Translator::Layout type_layout) {
+    if (target == nullptr || target != GetForegroundWindow()) {
         return false;
     }
 
+    if (type_layout == Translator::Layout::Other) {
+        type_layout = Translator::infer_layout(text);
+    }
+
     release_held_modifiers();
-
-    if (replace_via_edit_messages(target, delete_count, text, trailing_vk)) {
-        return true;
+    if (!switch_layout(target, type_layout)) {
+        return false;
     }
 
-    if (async_input) {
-        return replace_via_clipboard(target, delete_count, text, trailing_vk);
-    }
-
+    std::vector<INPUT> inputs;
+    inputs.reserve(delete_count * 2 + text.size() * 6 + 2);
     for (std::size_t i = 0; i < delete_count; ++i) {
-        if (!send_key(VK_BACK)) {
-            return false;
-        }
+        append_key(inputs, VK_BACK);
     }
-
-    if (delete_count != 0) {
-        static_cast<void>(wait_for_target_input(focused_input_window(target), kReplaceFlushTimeoutMs));
-        if (target != GetForegroundWindow()) {
-            return false;
-        }
+    if (!append_text_keys(inputs, text, type_layout)) {
+        return false;
     }
-
-    for (const wchar_t ch : text) {
-        std::vector<INPUT> glyph;
-        append_unicode(glyph, ch);
-        if (!send_inputs(glyph)) {
-            return false;
-        }
-    }
-
     if (trailing_vk != 0) {
-        if (!send_key(static_cast<WORD>(trailing_vk))) {
-            return false;
-        }
+        append_key(inputs, static_cast<WORD>(trailing_vk));
     }
 
+    if (!send_inputs(inputs)) {
+        return false;
+    }
+    static_cast<void>(wait_for_target(target));
     return target == GetForegroundWindow();
 }
 
@@ -661,117 +346,38 @@ bool InputSimulator::convert_selection() {
         return false;
     }
 
-    release_held_modifiers();
-    Sleep(30);
-
-    ClipboardTextRestore restore(clipboard_text());
-    HWND edit = find_text_control(target);
-    const HWND copy_target = (edit != nullptr) ? edit : focused_input_window(target);
-
-    std::optional<std::wstring> selected;
-    for (int attempt = 0; attempt < 3; ++attempt) {
-        const DWORD sequence = GetClipboardSequenceNumber();
-        bool copied = false;
-        if (copy_target != nullptr) {
-            DWORD_PTR ignored = 0;
-            copied = SendMessageTimeoutW(
-                         copy_target,
-                         WM_COPY,
-                         0,
-                         0,
-                         SMTO_ABORTIFHUNG | SMTO_BLOCK,
-                         200,
-                         &ignored) != 0 &&
-                     GetClipboardSequenceNumber() != sequence;
-        }
-        if (!copied) {
-            if (!send_chord(VK_CONTROL, 'C')) {
-                return false;
-            }
-            copied = wait_for_clipboard_change(sequence, target);
-        }
-        if (copied) {
-            Sleep(20);
-        }
-        selected = clipboard_text();
-        if (selected.has_value() && !selected->empty() && selected->size() <= 8192) {
-            break;
-        }
-        Sleep(50);
-    }
-
-    if (!selected.has_value() || selected->empty() || selected->size() > 8192) {
+    const auto selected = focused_selection_text();
+    if (!selected.has_value()) {
         return false;
     }
 
     const std::wstring converted = Translator::convert(*selected);
-    if (converted == *selected) {
+    if (converted.empty() || converted == *selected) {
         return false;
     }
 
-    if (GetForegroundWindow() != target) {
-        return false;
-    }
-    if (!set_clipboard_text(converted)) {
-        return false;
-    }
+    const auto source = Translator::infer_layout(*selected);
+    const auto target_layout = Translator::opposite(source);
 
-    bool pasted = false;
-    if (edit != nullptr && text_control_score(class_name_lowered(edit)) != 0) {
-        pasted = timed_message(edit, WM_PASTE, 0, 0, 400);
-    }
-    if (!pasted) {
-        if (!send_chord(VK_CONTROL, 'V')) {
-            release_held_modifiers();
-            return false;
-        }
-    }
-    if (!wait_for_target_input(focused_input_window(target), kClipboardTimeoutMs)) {
-        release_held_modifiers();
-        return false;
-    }
-    Sleep(150);
     release_held_modifiers();
+    if (!switch_layout(target, target_layout)) {
+        return false;
+    }
 
-    activate_layout(Translator::opposite(Translator::infer_layout(*selected)));
-    return true;
+    std::vector<INPUT> inputs;
+    append_key(inputs, VK_DELETE);
+    if (!append_text_keys(inputs, converted, target_layout)) {
+        return false;
+    }
+    if (!send_inputs(inputs)) {
+        return false;
+    }
+    static_cast<void>(wait_for_target(target));
+    return target == GetForegroundWindow();
 }
 
 bool InputSimulator::activate_layout(Translator::Layout layout) {
-    if (layout == Translator::Layout::Other) {
-        return false;
-    }
-
-    const HKL hkl = load_layout(layout);
-    if (hkl == nullptr) {
-        return false;
-    }
-
-    HWND foreground = GetForegroundWindow();
-    if (foreground == nullptr) {
-        return false;
-    }
-
-    HWND focus = focused_input_window(foreground);
-    if (focus == nullptr) {
-        focus = foreground;
-    }
-
-    const auto request = [&](HWND hwnd) {
-        if (hwnd == nullptr || !IsWindow(hwnd)) {
-            return;
-        }
-        PostMessageW(
-            hwnd,
-            WM_INPUTLANGCHANGEREQUEST,
-            INPUTLANGCHANGE_SYSCHARSET,
-            reinterpret_cast<LPARAM>(hkl));
-    };
-    request(focus);
-    if (foreground != focus) {
-        request(foreground);
-    }
-    return true;
+    return switch_layout(GetForegroundWindow(), layout);
 }
 
 bool InputSimulator::send_virtual_key(UINT vk) {
@@ -779,7 +385,9 @@ bool InputSimulator::send_virtual_key(UINT vk) {
         return false;
     }
     release_held_modifiers();
-    return send_key(static_cast<WORD>(vk));
+    std::vector<INPUT> inputs;
+    append_key(inputs, static_cast<WORD>(vk));
+    return send_inputs(inputs);
 }
 
 void InputSimulator::restore_system_layouts() {

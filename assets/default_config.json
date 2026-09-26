@@ -8,6 +8,7 @@
   "learn_word_hotkey": "Alt+Pause",
   "undo_hotkey": "Shift+Pause",
   "start_with_windows": false,
+  "check_updates": true,
   "excluded_processes": [
     "keepass.exe",
     "keepassxc.exe",

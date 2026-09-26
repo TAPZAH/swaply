@@ -71,7 +71,7 @@ TrayIcon::TrayIcon(HINSTANCE instance, HWND window)
     data_.uFlags = NIF_MESSAGE | NIF_ICON | NIF_TIP;
     data_.uCallbackMessage = callback_message;
     data_.hIcon = load_app_icon(instance_);
-    copy_tip(data_.szTip, std::size(data_.szTip), L"wxneur " WXNEUR_VERSION_STRW);
+    copy_tip(data_.szTip, std::size(data_.szTip), L"Swaply " SWAPLY_VERSION_STRW);
 
     add();
 }
@@ -87,7 +87,7 @@ void TrayIcon::set_menu_state(bool enabled, bool auto_switch, bool autostart) no
     copy_tip(
         data_.szTip,
         std::size(data_.szTip),
-        enabled_ ? L"wxneur " WXNEUR_VERSION_STRW : L"wxneur " WXNEUR_VERSION_STRW L" (пауза)");
+        enabled_ ? L"Swaply " SWAPLY_VERSION_STRW : L"Swaply " SWAPLY_VERSION_STRW L" (пауза)");
     if (added_) {
         Shell_NotifyIconW(NIM_MODIFY, &data_);
     }
@@ -157,6 +157,7 @@ void TrayIcon::show_context_menu() const {
         !AppendMenuW(menu.get(), MF_SEPARATOR, 0, nullptr) ||
         !AppendMenuW(menu.get(), MF_STRING, undo_command_id, L"Отменить конвертацию") ||
         !AppendMenuW(menu.get(), MF_STRING, settings_command_id, L"Параметры...") ||
+        !AppendMenuW(menu.get(), MF_STRING, update_command_id, L"Проверить обновления...") ||
         !AppendMenuW(menu.get(), MF_STRING, about_command_id, L"О программе...") ||
         !AppendMenuW(menu.get(), MF_SEPARATOR, 0, nullptr) ||
         !AppendMenuW(menu.get(), MF_STRING, exit_command_id, L"Выход")) {

@@ -6,10 +6,13 @@
 
 namespace {
 
-constexpr wchar_t kAppFolder[] = L"wxneur";
+constexpr wchar_t kAppFolder[] = L"Swaply";
 constexpr wchar_t kConfigName[] = L"config.json";
 constexpr wchar_t kRunKey[] = L"Software\\Microsoft\\Windows\\CurrentVersion\\Run";
-constexpr wchar_t kRunValue[] = L"wxneur";
+constexpr wchar_t kRunValue[] = L"Swaply";
+// Previous product name, migrated on first start.
+constexpr wchar_t kLegacyAppFolder[] = L"wxneur";
+constexpr wchar_t kLegacyRunValue[] = L"wxneur";
 
 [[nodiscard]] std::wstring appdata_dir() {
     wchar_t appdata[MAX_PATH]{};
@@ -227,6 +230,10 @@ void apply_field(AppConfig& config, const std::string& key, std::string_view tex
         static_cast<void>(parse_bool(text, i, config.start_with_windows));
         return;
     }
+    if (key == "check_updates") {
+        static_cast<void>(parse_bool(text, i, config.check_updates));
+        return;
+    }
     if (key == "min_word_length") {
         std::size_t value = config.min_word_length;
         if (parse_size(text, i, value) && value >= 2 && value <= 32) {
@@ -358,17 +365,24 @@ void write_string_array(std::ostringstream& ss, const char* key, const std::vect
     ss << ']';
 }
 
+[[nodiscard]] bool registry_value_present(HKEY key, const wchar_t* name) {
+    wchar_t value[MAX_PATH]{};
+    DWORD size = sizeof(value);
+    const LSTATUS status =
+        RegQueryValueExW(key, name, nullptr, nullptr, reinterpret_cast<LPBYTE>(value), &size);
+    return status == ERROR_SUCCESS && value[0] != L'\0';
+}
+
 [[nodiscard]] bool registry_autostart_enabled() {
     HKEY key = nullptr;
     if (RegOpenKeyExW(HKEY_CURRENT_USER, kRunKey, 0, KEY_QUERY_VALUE, &key) != ERROR_SUCCESS) {
         return false;
     }
 
-    wchar_t value[MAX_PATH]{};
-    DWORD size = sizeof(value);
-    const LSTATUS status = RegQueryValueExW(key, kRunValue, nullptr, nullptr, reinterpret_cast<LPBYTE>(value), &size);
+    const bool enabled =
+        registry_value_present(key, kRunValue) || registry_value_present(key, kLegacyRunValue);
     RegCloseKey(key);
-    return status == ERROR_SUCCESS && value[0] != L'\0';
+    return enabled;
 }
 
 [[nodiscard]] std::wstring exe_path() {
@@ -392,6 +406,34 @@ void write_string_array(std::ostringstream& ss, const char* key, const std::vect
 [[nodiscard]] bool file_exists(const std::wstring& path) {
     const DWORD attributes = GetFileAttributesW(path.c_str());
     return attributes != INVALID_FILE_ATTRIBUTES && (attributes & FILE_ATTRIBUTE_DIRECTORY) == 0;
+}
+
+// Copies settings from the pre-rename %APPDATA%\wxneur folder on first start.
+void migrate_legacy_config() {
+    if (is_portable_install()) {
+        return;
+    }
+
+    const std::wstring new_path = config_path();
+    if (new_path.empty() || file_exists(new_path)) {
+        return;
+    }
+
+    wchar_t appdata[MAX_PATH]{};
+    if (GetEnvironmentVariableW(L"APPDATA", appdata, MAX_PATH) == 0) {
+        return;
+    }
+
+    const std::wstring legacy_path =
+        std::wstring(appdata) + L'\\' + kLegacyAppFolder + L'\\' + kConfigName;
+    if (!file_exists(legacy_path)) {
+        return;
+    }
+
+    const std::string text = read_utf8_file(legacy_path);
+    if (!text.empty()) {
+        static_cast<void>(write_utf8_file(new_path, text));
+    }
 }
 
 }  // namespace
@@ -442,6 +484,8 @@ bool AppConfig::apply_autostart() const {
         }
     }
 
+    RegDeleteValueW(key, kLegacyRunValue);
+
     RegCloseKey(key);
     return status == ERROR_SUCCESS;
 }
@@ -449,6 +493,8 @@ bool AppConfig::apply_autostart() const {
 AppConfig AppConfig::load() {
     AppConfig config{};
     config.excluded_processes = {"keepass.exe", "keepassxc.exe", "1password.exe"};
+
+    migrate_legacy_config();
 
     const std::wstring user_path = config_path();
     std::string text = user_path.empty() ? std::string{} : read_utf8_file(user_path);
@@ -473,6 +519,10 @@ AppConfig AppConfig::load() {
         config.start_with_windows = false;
     } else {
         config.start_with_windows = registry_autostart_enabled();
+        if (config.start_with_windows) {
+            // Re-register under the new value name, dropping the legacy entry.
+            static_cast<void>(config.apply_autostart());
+        }
     }
     return config;
 }
@@ -493,7 +543,8 @@ bool AppConfig::save() const {
        << "  \"convert_selection_hotkey\": \"" << json_escape(convert_selection.to_string()) << "\",\n"
        << "  \"learn_word_hotkey\": \"" << json_escape(learn_word.to_string()) << "\",\n"
        << "  \"undo_hotkey\": \"" << json_escape(undo_conversion.to_string()) << "\",\n"
-       << "  \"start_with_windows\": " << (start_with_windows ? "true" : "false") << ",\n";
+       << "  \"start_with_windows\": " << (start_with_windows ? "true" : "false") << ",\n"
+       << "  \"check_updates\": " << (check_updates ? "true" : "false") << ",\n";
     write_string_array(ss, "excluded_processes", excluded_processes);
     ss << ",\n";
     write_string_array(ss, "extra_en", extra_en);

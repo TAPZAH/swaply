@@ -1,12 +1,12 @@
 cmake_minimum_required(VERSION 3.16)
 
-project(wxneur VERSION 0.985.0 LANGUAGES CXX)
+project(Swaply VERSION 0.986.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-add_executable(wxneur
+add_executable(Swaply
     src/main.cpp
     src/config.cpp
     src/hotkey.cpp
@@ -17,18 +17,19 @@ add_executable(wxneur
     src/word_index.cpp
     src/focus_guard.cpp
     src/input_sim.cpp
+    src/updater.cpp
     src/tray_icon.cpp
     src/settings_dialog.cpp
-    src/wxneur.rc
+    src/swaply.rc
 )
 
-set_target_properties(wxneur PROPERTIES
+set_target_properties(Swaply PROPERTIES
     WIN32_EXECUTABLE TRUE
 )
 
-target_include_directories(wxneur PRIVATE src)
+target_include_directories(Swaply PRIVATE src)
 
-target_compile_definitions(wxneur PRIVATE
+target_compile_definitions(Swaply PRIVATE
     UNICODE
     _UNICODE
     NOMINMAX
@@ -37,7 +38,7 @@ target_compile_definitions(wxneur PRIVATE
     _WIN32_WINNT=0x0A00
 )
 
-target_link_libraries(wxneur PRIVATE
+target_link_libraries(Swaply PRIVATE
     user32
     shell32
     advapi32
@@ -45,33 +46,34 @@ target_link_libraries(wxneur PRIVATE
     ole32
     oleaut32
     uiautomationcore
+    winhttp
 )
 
-add_custom_command(TARGET wxneur POST_BUILD
+add_custom_command(TARGET Swaply POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         "${CMAKE_SOURCE_DIR}/assets/default_config.json"
-        "$<TARGET_FILE_DIR:wxneur>/default_config.json"
+        "$<TARGET_FILE_DIR:Swaply>/default_config.json"
     COMMAND ${CMAKE_COMMAND} -E copy_directory
         "${CMAKE_SOURCE_DIR}/assets/dict"
-        "$<TARGET_FILE_DIR:wxneur>/dict"
+        "$<TARGET_FILE_DIR:Swaply>/dict"
 )
 
 if(MSVC)
-    target_compile_options(wxneur PRIVATE /W4 /permissive- /utf-8)
-    target_link_options(wxneur PRIVATE
+    target_compile_options(Swaply PRIVATE /W4 /permissive- /utf-8)
+    target_link_options(Swaply PRIVATE
         "/MANIFESTDEPENDENCY:type='win32' name='Microsoft.Windows.Common-Controls' version='6.0.0.0' processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'"
     )
     set(CMAKE_RC_FLAGS "${CMAKE_RC_FLAGS} /I${CMAKE_SOURCE_DIR} /I${CMAKE_SOURCE_DIR}/src")
 else()
-    target_compile_options(wxneur PRIVATE -Wall -Wextra -Wpedantic)
+    target_compile_options(Swaply PRIVATE -Wall -Wextra -Wpedantic)
     set(CMAKE_RC_FLAGS "${CMAKE_RC_FLAGS} -I${CMAKE_SOURCE_DIR} -I${CMAKE_SOURCE_DIR}/src")
 endif()
 
 if(MINGW)
-    target_link_options(wxneur PRIVATE -municode)
+    target_link_options(Swaply PRIVATE -municode)
 endif()
 
-add_executable(wxneur_tests
+add_executable(swaply_tests
     tests/test_core.cpp
     src/translator.cpp
     src/layout_detector.cpp
@@ -81,8 +83,8 @@ add_executable(wxneur_tests
     src/focus_guard.cpp
 )
 
-target_include_directories(wxneur_tests PRIVATE src)
-target_compile_definitions(wxneur_tests PRIVATE
+target_include_directories(swaply_tests PRIVATE src)
+target_compile_definitions(swaply_tests PRIVATE
     UNICODE
     _UNICODE
     NOMINMAX
@@ -90,19 +92,19 @@ target_compile_definitions(wxneur_tests PRIVATE
     WINVER=0x0A00
     _WIN32_WINNT=0x0A00
 )
-target_link_libraries(wxneur_tests PRIVATE user32)
+target_link_libraries(swaply_tests PRIVATE user32)
 
-add_custom_command(TARGET wxneur_tests POST_BUILD
+add_custom_command(TARGET swaply_tests POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
         "${CMAKE_SOURCE_DIR}/assets/dict"
-        "$<TARGET_FILE_DIR:wxneur_tests>/dict"
+        "$<TARGET_FILE_DIR:swaply_tests>/dict"
 )
 
 if(MSVC)
-    target_compile_options(wxneur_tests PRIVATE /W4 /permissive- /utf-8)
+    target_compile_options(swaply_tests PRIVATE /W4 /permissive- /utf-8)
 else()
-    target_compile_options(wxneur_tests PRIVATE -Wall -Wextra -Wpedantic)
+    target_compile_options(swaply_tests PRIVATE -Wall -Wextra -Wpedantic)
 endif()
 
 enable_testing()
-add_test(NAME wxneur_core COMMAND wxneur_tests)
+add_test(NAME Swaply_core COMMAND swaply_tests)

@@ -13,6 +13,7 @@ public:
     static constexpr UINT settings_command_id = 5;
     static constexpr UINT undo_command_id = 6;
     static constexpr UINT about_command_id = 7;
+    static constexpr UINT update_command_id = 8;
 
     TrayIcon(HINSTANCE instance, HWND window);
     ~TrayIcon();

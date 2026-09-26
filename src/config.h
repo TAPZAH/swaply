@@ -18,6 +18,7 @@ struct AppConfig {
     Hotkey learn_word{VK_PAUSE, false, true, false, false};
     Hotkey undo_conversion{VK_PAUSE, false, false, true, false};
     bool start_with_windows = false;
+    bool check_updates = true;
     std::vector<std::string> excluded_processes;
     std::vector<std::string> extra_en;
     std::vector<std::string> extra_ru;

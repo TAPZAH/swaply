@@ -29,5 +29,6 @@
 #define IDC_CHK_UNDO_ALT 227
 #define IDC_CHK_UNDO_SHIFT 228
 #define IDC_CMB_UNDO 229
+#define IDC_CHK_UPDATES 230
 
 #define IDD_ABOUT 300

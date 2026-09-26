@@ -197,6 +197,7 @@ INT_PTR CALLBACK settings_proc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam
         }
 
         set_check(hwnd, IDC_CHK_ENABLED, state->config->enabled);
+        set_check(hwnd, IDC_CHK_UPDATES, state->config->check_updates);
         set_check(hwnd, IDC_CHK_AUTO, state->config->auto_switch);
         set_check(hwnd, IDC_CHK_PASSWORD, state->config->ignore_password_fields);
         set_check(hwnd, IDC_CHK_AUTOSTART, state->config->start_with_windows);
@@ -229,6 +230,7 @@ INT_PTR CALLBACK settings_proc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam
             }
 
             state->config->enabled = get_check(hwnd, IDC_CHK_ENABLED);
+            state->config->check_updates = get_check(hwnd, IDC_CHK_UPDATES);
             state->config->auto_switch = get_check(hwnd, IDC_CHK_AUTO);
             state->config->ignore_password_fields = get_check(hwnd, IDC_CHK_PASSWORD);
             state->config->start_with_windows =

@@ -1,4 +1,4 @@
-/* wxneur — свободный переключатель раскладки для Windows.
+/* Swaply — свободный переключатель раскладки для Windows.
  * Copyright (C) 2026 Tap3ah
  *
  * This program is free software: you can redistribute it and/or modify
@@ -16,20 +16,25 @@
 #include "text_tracker.h"
 #include "translator.h"
 #include "tray_icon.h"
+#include "updater.h"
 #include "version.h"
 
 #include <algorithm>
+#include <atomic>
+#include <memory>
 #include <stdexcept>
 #include <string>
 #include <system_error>
+#include <thread>
 #include <utility>
 
 #include <objbase.h>
 
 namespace {
 
-constexpr wchar_t kWindowClassName[] = L"wxneur.HiddenTrayWindow";
-constexpr wchar_t kInstanceMutexName[] = L"Local\\wxneur.single_instance";
+constexpr wchar_t kWindowClassName[] = L"Swaply.HiddenTrayWindow";
+constexpr wchar_t kInstanceMutexName[] = L"Local\\Swaply.single_instance";
+constexpr UINT update_check_message = WM_APP + 4;
 
 [[noreturn]] void throw_last_error(const char* what) {
     throw std::system_error(
@@ -100,7 +105,7 @@ public:
         hwnd_ = CreateWindowExW(
             WS_EX_TOOLWINDOW,
             class_name,
-            L"wxneur " WXNEUR_VERSION_STRW,
+            L"Swaply " SWAPLY_VERSION_STRW,
             WS_POPUP,
             0,
             0,
@@ -165,7 +170,52 @@ struct AppState {
     TextTracker* tracker = nullptr;
     LastConversion last{};
     UINT taskbar_created = 0;
+    HWND window = nullptr;
+    std::atomic<bool> update_check_running{false};
 };
+
+void start_update_check(AppState& state, bool silent) {
+    if (state.window == nullptr || state.update_check_running.exchange(true)) {
+        return;
+    }
+
+    const HWND owner = state.window;
+    std::thread([owner, silent]() {
+        auto* info = new UpdateInfo(Updater::check());
+        if (!PostMessageW(owner, update_check_message, silent ? 1 : 0, reinterpret_cast<LPARAM>(info))) {
+            delete info;
+        }
+    }).detach();
+}
+
+void handle_update_result(AppState& state, const UpdateInfo& info, bool silent) {
+    state.update_check_running.store(false);
+
+    if (info.available) {
+        const std::wstring text =
+            L"Доступна новая версия Swaply " + info.version +
+            L".\n\nСкачать и установить сейчас? Программа будет закрыта.";
+        if (MessageBoxW(
+                state.window, text.c_str(), L"Обновление Swaply",
+                MB_YESNO | MB_ICONINFORMATION) == IDYES) {
+            if (!Updater::download_and_run(info.url)) {
+                MessageBoxW(
+                    state.window, L"Не удалось скачать или запустить установщик.",
+                    L"Swaply — ошибка", MB_OK | MB_ICONERROR);
+            } else if (state.window != nullptr && IsWindow(state.window)) {
+                DestroyWindow(state.window);
+            }
+        }
+        return;
+    }
+
+    if (!silent) {
+        const wchar_t* text = info.check_failed
+                                  ? L"Не удалось проверить обновления. Проверьте подключение к интернету."
+                                  : L"Установлена последняя версия Swaply.";
+        MessageBoxW(state.window, text, L"Обновление Swaply", MB_OK | MB_ICONINFORMATION);
+    }
+}
 
 void sync_tray(AppState& state) {
     if (state.tray != nullptr && state.config != nullptr) {
@@ -431,6 +481,9 @@ bool handle_command(AppState& state, HWND hwnd, WPARAM wparam) {
     case TrayIcon::about_command_id:
         show_about_dialog(hwnd);
         return true;
+    case TrayIcon::update_command_id:
+        start_update_check(state, false);
+        return true;
     case TrayIcon::settings_command_id:
         if (show_settings_dialog(hwnd, *state.config)) {
             state.config->save();
@@ -465,6 +518,14 @@ LRESULT CALLBACK hidden_wnd_proc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lpar
     if (state != nullptr) {
         if (msg == HookManager::queue_message) {
             drain_key_queue(*state);
+            return 0;
+        }
+
+        if (msg == update_check_message) {
+            const std::unique_ptr<UpdateInfo> info(reinterpret_cast<UpdateInfo*>(lparam));
+            if (info != nullptr) {
+                handle_update_result(*state, *info, wparam != 0);
+            }
             return 0;
         }
 
@@ -527,10 +588,15 @@ int run(HINSTANCE instance) {
     state.tray = &tray;
     state.hook = &hook;
     state.tracker = &tracker;
+    state.window = window.get();
     state.taskbar_created = RegisterWindowMessageW(L"TaskbarCreated");
     InputSimulator::restore_system_layouts();
     apply_runtime_config(state);
     SetWindowLongPtrW(window.get(), GWLP_USERDATA, reinterpret_cast<LONG_PTR>(&state));
+
+    if (config.check_updates) {
+        start_update_check(state, true);
+    }
 
     MSG msg{};
     while (true) {
@@ -581,7 +647,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int) {
     } catch (const std::exception& ex) {
         const std::string what = ex.what();
         const std::wstring message(what.begin(), what.end());
-        MessageBoxW(nullptr, message.c_str(), L"wxneur — ошибка", MB_OK | MB_ICONERROR);
+        MessageBoxW(nullptr, message.c_str(), L"Swaply — ошибка", MB_OK | MB_ICONERROR);
         return 1;
     }
 }

@@ -7,8 +7,8 @@
 IDI_APPICON ICON "assets/icon.ico"
 
 1 VERSIONINFO
-FILEVERSION WXNEUR_VERSION_COMMA
-PRODUCTVERSION WXNEUR_VERSION_COMMA
+FILEVERSION SWAPLY_VERSION_COMMA
+PRODUCTVERSION SWAPLY_VERSION_COMMA
 FILEFLAGSMASK 0x3fL
 FILEFLAGS 0x2L
 FILEOS 0x40004L
@@ -19,14 +19,14 @@ BEGIN
     BEGIN
         BLOCK "041904B0"
         BEGIN
-            VALUE "CompanyName", WXNEUR_AUTHOR
-            VALUE "FileDescription", "wxneur — переключатель раскладки клавиатуры"
-            VALUE "FileVersion", WXNEUR_VERSION_STR
-            VALUE "InternalName", WXNEUR_PRODUCT
-            VALUE "LegalCopyright", WXNEUR_COPYRIGHT
-            VALUE "OriginalFilename", "wxneur.exe"
-            VALUE "ProductName", WXNEUR_PRODUCT
-            VALUE "ProductVersion", WXNEUR_VERSION_STR
+            VALUE "CompanyName", SWAPLY_AUTHOR
+            VALUE "FileDescription", "Swaply — переключатель раскладки клавиатуры"
+            VALUE "FileVersion", SWAPLY_VERSION_STR
+            VALUE "InternalName", SWAPLY_PRODUCT
+            VALUE "LegalCopyright", SWAPLY_COPYRIGHT
+            VALUE "OriginalFilename", "Swaply.exe"
+            VALUE "ProductName", SWAPLY_PRODUCT
+            VALUE "ProductVersion", SWAPLY_VERSION_STR
             VALUE "Comments", "GNU GPL v3 or later"
         END
     END
@@ -42,21 +42,22 @@ CAPTION "О программе"
 FONT 9, "Segoe UI", 400, 0, 0x1
 BEGIN
     ICON IDI_APPICON, -1, 12, 12, 20, 20
-    LTEXT "wxneur 0.985 beta", -1, 44, 12, 220, 12
+    LTEXT "Swaply 0.986 beta", -1, 44, 12, 220, 12
     LTEXT "Автор: Tap3ah", -1, 44, 26, 220, 10
     LTEXT "Автоматический переключатель раскладки EN/RU для Windows.", -1, 12, 48, 256, 18
     LTEXT "Лицензия: GNU GPL версии 3 или более поздней", -1, 12, 70, 256, 10
     LTEXT "Словари: FrequencyWords (CC-BY-SA-4.0), эвристики xneur (GPL-2.0+).", -1, 12, 84, 256, 20
-    LTEXT WXNEUR_COPYRIGHT, -1, 12, 108, 256, 10
+    LTEXT SWAPLY_COPYRIGHT, -1, 12, 108, 256, 10
     DEFPUSHBUTTON "ОК", IDOK, 218, 126, 50, 14
 END
 
 IDD_SETTINGS DIALOGEX 0, 0, 360, 386
 STYLE DS_SETFONT | DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
-CAPTION "Параметры wxneur"
+CAPTION "Параметры Swaply"
 FONT 9, "Segoe UI", 400, 0, 0x1
 BEGIN
     AUTOCHECKBOX "Включено", IDC_CHK_ENABLED, 12, 10, 160, 12
+    AUTOCHECKBOX "Проверять обновления", IDC_CHK_UPDATES, 185, 10, 165, 12
     AUTOCHECKBOX "Автопереключение раскладки", IDC_CHK_AUTO, 12, 24, 200, 12
     AUTOCHECKBOX "Игнорировать поля пароля", IDC_CHK_PASSWORD, 12, 38, 200, 12
     AUTOCHECKBOX "Запускать вместе с Windows", IDC_CHK_AUTOSTART, 12, 52, 200, 12
@@ -106,7 +107,7 @@ BEGIN
     EDITTEXT IDC_EDIT_EXCEPTIONS, 12, 304, 336, 36, ES_MULTILINE | ES_WANTRETURN | ES_AUTOVSCROLL | WS_VSCROLL | WS_TABSTOP
     LTEXT "Встроенные правила xneur: http, ftp, www, IP, MAC, .рф, частицы а/в/и/к/ну/о/у/я.", -1, 12, 344, 336, 10
 
-    LTEXT "wxneur 0.985 beta · автор Tap3ah · GNU GPL v3+", -1, 12, 366, 230, 10
+    LTEXT "Swaply 0.986 beta · автор Tap3ah · GNU GPL v3+", -1, 12, 366, 230, 10
     DEFPUSHBUTTON "ОК", IDOK, 248, 364, 50, 14
     PUSHBUTTON "Отмена", IDCANCEL, 302, 364, 50, 14
 END

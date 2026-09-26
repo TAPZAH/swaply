@@ -174,6 +174,20 @@ int main() {
     expect(hotkey_tracker.on_key(key_event(VK_PAUSE, en)) == TextTracker::Action::ConvertWord,
            "pause_with_word_converts_word");
 
+    expect(LayoutDetector::should_switch(L"d", L"в", Translator::Layout::En), "particle_d_to_ve");
+    expect(LayoutDetector::should_switch(L"b", L"и", Translator::Layout::En), "particle_b_to_i");
+    expect(LayoutDetector::should_switch(L"r", L"к", Translator::Layout::En), "particle_r_to_ka");
+    expect(LayoutDetector::should_switch(L"c", L"с", Translator::Layout::En), "particle_c_to_es");
+    expect(LayoutDetector::should_switch(L"j", L"о", Translator::Layout::En), "particle_j_to_o");
+    expect(LayoutDetector::should_switch(L"e", L"у", Translator::Layout::En), "particle_e_to_u");
+    expect(LayoutDetector::should_switch(L"f", L"а", Translator::Layout::En), "particle_f_to_a");
+    expect(LayoutDetector::should_switch(L"z", L"я", Translator::Layout::En), "particle_z_to_ya");
+    expect(!LayoutDetector::should_switch(L"в", L"d", Translator::Layout::Ru), "particle_keep_correct_ru");
+    expect(!LayoutDetector::should_switch(L"и", L"b", Translator::Layout::Ru), "particle_keep_correct_ru_i");
+    expect(!LayoutDetector::should_switch(L"a", L"ф", Translator::Layout::En), "particle_keep_en_article");
+    expect(!LayoutDetector::should_switch(L"i", L"ш", Translator::Layout::En), "particle_keep_en_pronoun");
+    expect(LayoutDetector::should_switch(L"ш", L"i", Translator::Layout::Ru), "particle_ru_to_en_i");
+
     if (g_failed != 0) {
         std::cerr << g_failed << " test(s) failed\n";
         return 1;

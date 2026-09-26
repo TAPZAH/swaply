@@ -636,6 +636,29 @@ namespace {
     return false;
 }
 
+// Standalone single-letter words per language. A lone letter is switched only
+// when it is a word in the opposite layout but not in the current one, so the
+// Russian particles а/в/и/к/о/с/у/я are corrected from a wrong layout while
+// correct input and the English words "a"/"i" are left alone.
+[[nodiscard]] bool is_single_letter_word(wchar_t ch, Translator::Layout layout) noexcept {
+    if (layout == Translator::Layout::Ru) {
+        switch (ch) {
+        case L'а':
+        case L'в':
+        case L'и':
+        case L'к':
+        case L'о':
+        case L'с':
+        case L'у':
+        case L'я':
+            return true;
+        default:
+            return false;
+        }
+    }
+    return ch == L'a' || ch == L'i';
+}
+
 [[nodiscard]] bool should_switch_atom(
     std::wstring_view typed,
     std::wstring_view converted,
@@ -659,12 +682,18 @@ namespace {
         return false;
     }
 
+    const auto target = Translator::opposite(source);
+
+    if (typed_core.size() == 1 && converted_core.size() == 1) {
+        return is_single_letter_word(converted_core[0], target) &&
+               !is_single_letter_word(typed_core[0], source);
+    }
+
     const bool allow_short = typed_core.size() == 2 && min_length <= 3;
     if (typed_core.size() < min_length && !allow_short) {
         return false;
     }
 
-    const auto target = Translator::opposite(source);
     if (matches_xneur_exception(converted, target)) {
         return true;
     }

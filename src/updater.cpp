@@ -15,8 +15,8 @@ namespace {
 // Only the official repository is ever contacted, over HTTPS. Binaries are not
 // code-signed, so integrity relies on TLS plus this fixed host.
 constexpr wchar_t kApiHost[] = L"api.github.com";
-constexpr wchar_t kApiPath[] = L"/repos/TAPZAH/wxneur/releases?per_page=1";
-constexpr char kDownloadPrefix[] = "https://github.com/TAPZAH/wxneur/";
+constexpr wchar_t kApiPath[] = L"/repos/TAPZAH/swaply/releases?per_page=1";
+constexpr char kDownloadPrefix[] = "https://github.com/TAPZAH/swaply/";
 constexpr std::size_t kMaxResponseBytes = 8 * 1024 * 1024;
 
 class WinHttpHandle {
@@ -233,7 +233,7 @@ UpdateInfo Updater::check() {
 }
 
 bool Updater::download_and_run(const std::wstring& url) {
-    if (url.rfind(L"https://github.com/TAPZAH/wxneur/", 0) != 0) {
+    if (url.rfind(L"https://github.com/TAPZAH/swaply/", 0) != 0) {
         return false;
     }
 

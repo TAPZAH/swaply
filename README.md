@@ -46,7 +46,7 @@ Pause без набранного слова тоже конвертирует �
 
 ## Установка
 
-Готовые файлы: [релизы на GitHub](https://github.com/TAPZAH/wxneur/releases).
+Готовые файлы: [релизы на GitHub](https://github.com/TAPZAH/swaply/releases).
 
 - **Инсталлятор** `Swaply-0.986-beta-setup.exe` — в профиль пользователя, ярлык в меню Пуск и (по выбору) на рабочем столе
 - **Портативная сборка** `Swaply-0.986-beta-portable.zip` — распаковать и запустить `Swaply.exe` (в архиве есть маркер `portable`)

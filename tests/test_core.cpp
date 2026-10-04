@@ -141,27 +141,31 @@ int main() {
     auto_config.auto_switch = true;
     auto_config.ignore_password_fields = false;
     TextTracker auto_tracker(auto_config);
-    expect(auto_tracker.on_key(key_event('C', en)) == TextTracker::Action::DiscardUndo, "prefix_c");
-    expect(auto_tracker.on_key(key_event('L', en)) == TextTracker::Action::DiscardUndo, "prefix_cl");
-    expect(auto_tracker.on_key(key_event('T', en)) == TextTracker::Action::DiscardUndo, "prefix_clt_waits_for_space");
-    expect_eq(auto_tracker.current_word(), L"clt", "prefix_clt_keeps_full_word");
-    expect_eq(auto_tracker.converted_word(), L"сде", "prefix_clt_converted");
-    expect(auto_tracker.on_key(key_event('K', en)) == TextTracker::Action::DiscardUndo, "prefix_cltk");
-    expect(auto_tracker.on_key(key_event('F', en)) == TextTracker::Action::DiscardUndo, "prefix_cltkf");
-    expect(auto_tracker.on_key(key_event('Q', en)) == TextTracker::Action::DiscardUndo, "prefix_cltkfq");
-    expect(auto_tracker.on_key(key_event(VK_SPACE, en)) == TextTracker::Action::AutoConvert, "space_autoconvert_sdelay");
+    expect(auto_tracker.on_key(key_event('C', en)) == TextTracker::Action::DiscardUndo, "early_c_waits");
+    expect(auto_tracker.on_key(key_event('L', en)) == TextTracker::Action::DiscardUndo, "early_cl_waits");
+    expect(auto_tracker.on_key(key_event('T', en)) == TextTracker::Action::AutoConvert, "early_clt_converts");
+    expect_eq(auto_tracker.current_word(), L"clt", "early_clt_word_kept");
+    expect_eq(auto_tracker.converted_word(), L"сде", "early_clt_converted");
+
+    TextTracker keep_tracker(auto_config);
+    expect(keep_tracker.on_key(key_event('H', en)) == TextTracker::Action::DiscardUndo, "keep_en_h");
+    expect(keep_tracker.on_key(key_event('E', en)) == TextTracker::Action::DiscardUndo, "keep_en_he");
+    expect(keep_tracker.on_key(key_event('L', en)) == TextTracker::Action::DiscardUndo, "keep_en_hel");
+    expect(keep_tracker.on_key(key_event('L', en)) == TextTracker::Action::DiscardUndo, "keep_en_hell");
+    expect(keep_tracker.on_key(key_event('O', en)) == TextTracker::Action::DiscardUndo, "keep_en_hello");
 
     TextTracker hyphen_tracker(auto_config);
-    const UINT chto_keys[] = {'X', 'N', 'J', VK_OEM_MINUS, 'N', 'J'};
-    TextTracker::Action last = TextTracker::Action::None;
-    for (UINT vk : chto_keys) {
-        last = hyphen_tracker.on_key(key_event(vk, en));
-    }
-    expect(last == TextTracker::Action::DiscardUndo, "hyphen_word_waits_for_space");
-    expect_eq(hyphen_tracker.current_word(), L"xnj-nj", "hyphen_word_kept");
-    expect_eq(hyphen_tracker.converted_word(), L"что-то", "hyphen_word_converted");
-    expect(hyphen_tracker.on_key(key_event(VK_SPACE, en)) == TextTracker::Action::AutoConvert,
-           "space_autoconvert_chto_to");
+    expect(hyphen_tracker.on_key(key_event('X', en)) == TextTracker::Action::DiscardUndo, "hyphen_x");
+    expect(hyphen_tracker.on_key(key_event('N', en)) == TextTracker::Action::DiscardUndo, "hyphen_xn");
+    expect(hyphen_tracker.on_key(key_event('J', en)) == TextTracker::Action::AutoConvert,
+           "hyphen_xnj_converts_early");
+
+    // Single-letter particles still wait for a delimiter instead of switching on
+    // the first keystroke.
+    TextTracker particle_tracker(auto_config);
+    expect(particle_tracker.on_key(key_event('C', en)) == TextTracker::Action::DiscardUndo, "particle_c_waits");
+    expect(particle_tracker.on_key(key_event(VK_SPACE, en)) == TextTracker::Action::AutoConvert,
+           "particle_c_converts_on_space");
 
     TextTracker hotkey_tracker(auto_config);
     expect(hotkey_tracker.on_key(key_event(VK_PAUSE, en)) == TextTracker::Action::ConvertSelection,

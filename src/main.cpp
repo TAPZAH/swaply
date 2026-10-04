@@ -370,9 +370,12 @@ void convert_current_word(AppState& state, bool auto_convert) {
         InputSimulator::activate_layout(target);
     }
 
-    if (auto_convert) {
+    if (auto_convert && terminator != 0) {
+        // Word finished at a delimiter: nothing more to append.
         tracker.clear();
     } else {
+        // Manual conversion or an early prefix match: keep the word so the rest
+        // can be typed in the already switched layout.
         tracker.assign_converted(converted);
     }
 }

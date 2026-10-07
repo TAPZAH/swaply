@@ -5,8 +5,8 @@ SetCompressor /SOLID lzma
 !include "FileFunc.nsh"
 
 !define APP_NAME "Swaply"
-!define APP_VERSION "0.987 beta"
-!define APP_VERSION_FILE "0.987-beta"
+!define APP_VERSION "0.988 beta"
+!define APP_VERSION_FILE "0.988-beta"
 !define APP_PUBLISHER "Tap3ah"
 !define APP_REG "Software\${APP_NAME}"
 !define APP_EXE "Swaply.exe"
@@ -47,7 +47,7 @@ LangString DESC_SecApp ${LANG_ENGLISH} "Swaply files, dictionaries and documenta
 LangString DESC_SecDesktop ${LANG_RUSSIAN} "Создать ярлык Swaply на рабочем столе."
 LangString DESC_SecDesktop ${LANG_ENGLISH} "Create a Swaply shortcut on the desktop."
 
-VIProductVersion "0.987.0.0"
+VIProductVersion "0.988.0.0"
 VIAddVersionKey /LANG=1049 "ProductName" "${APP_NAME}"
 VIAddVersionKey /LANG=1049 "ProductVersion" "${APP_VERSION}"
 VIAddVersionKey /LANG=1049 "CompanyName" "${APP_PUBLISHER}"

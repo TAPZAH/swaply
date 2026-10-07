@@ -216,6 +216,14 @@ int main() {
            "term_snip_known_ru");
     expect(!LayoutDetector::should_switch(L"ооо", Translator::convert(L"ооо"), Translator::Layout::Ru),
            "term_ooo_known_ru");
+    expect(!LayoutDetector::should_switch(L"унк", Translator::convert(L"унк"), Translator::Layout::Ru),
+           "term_unk_known_ru");
+    expect(!LayoutDetector::should_switch(L"сбп", Translator::convert(L"сбп"), Translator::Layout::Ru),
+           "term_sbp_known_ru");
+    expect(!LayoutDetector::should_switch(L"мсфо", Translator::convert(L"мсфо"), Translator::Layout::Ru),
+           "term_msfo_known_ru");
+    expect(!LayoutDetector::should_switch(L"ккт", Translator::convert(L"ккт"), Translator::Layout::Ru),
+           "term_kkt_known_ru");
 
     if (g_failed != 0) {
         std::cerr << g_failed << " test(s) failed\n";

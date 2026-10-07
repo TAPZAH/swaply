@@ -202,6 +202,10 @@ int main() {
            "term_eaes_known_ru");
     expect(!LayoutDetector::should_switch(L"гост", Translator::convert(L"гост"), Translator::Layout::Ru),
            "term_gost_known_ru");
+    expect(!LayoutDetector::should_switch(L"тн", Translator::convert(L"тн"), Translator::Layout::Ru),
+           "term_tn_known_ru");
+    expect(!LayoutDetector::should_switch(L"И.И.", L"B.B.", Translator::Layout::Ru), "initials_ru_kept");
+    expect(!LayoutDetector::should_switch(L"b.b", L"и.и", Translator::Layout::En), "initials_en_kept");
 
     if (g_failed != 0) {
         std::cerr << g_failed << " test(s) failed\n";

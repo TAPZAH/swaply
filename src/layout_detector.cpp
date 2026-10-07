@@ -243,7 +243,7 @@ constexpr const wchar_t* kRussian[] = {
     L"язык", L"ясно", L"лол", L"ага", L"угу", L"щас", L"норм", L"спс",
     L"раскладка", L"клавиатура", L"переключить", L"настройка", L"приложение",
     // ВЭД-аббревиатуры (cdx-group.ru)
-    L"аил", L"асп", L"вчу", L"вэд", L"гатт", L"гост", L"дсс", L"дтс", L"дул",
+    L"тн", L"аил", L"асп", L"вчу", L"вэд", L"гатт", L"гост", L"дсс", L"дтс", L"дул",
     L"еас", L"еаэс", L"елс", L"ескд", L"ест", L"кэк", L"нво", L"ндс", L"нпа",
     L"нтф", L"опи", L"пдт", L"пкр", L"ркт", L"рови", L"рчц", L"рэс", L"свх",
     L"сгр", L"ссс", L"сур", L"сэз", L"уил",
@@ -666,6 +666,29 @@ namespace {
     return ch == L'a' || ch == L'i';
 }
 
+// Abbreviated initials such as "И.И." (Иван Иванович) or "I.I." must never be
+// corrected: single letters separated by dots.
+[[nodiscard]] bool is_initial_token(std::wstring_view text) noexcept {
+    int letters = 0;
+    bool previous_letter = false;
+    bool has_dot = false;
+    for (const wchar_t ch : text) {
+        if (is_latin(ch) || is_cyrillic(ch)) {
+            if (previous_letter) {
+                return false;
+            }
+            ++letters;
+            previous_letter = true;
+        } else if (ch == L'.') {
+            has_dot = true;
+            previous_letter = false;
+        } else {
+            return false;
+        }
+    }
+    return has_dot && letters >= 2;
+}
+
 [[nodiscard]] bool should_switch_atom(
     std::wstring_view typed,
     std::wstring_view converted,
@@ -676,6 +699,10 @@ namespace {
     }
 
     if (LayoutDetector::is_technical_token(typed) || LayoutDetector::is_technical_token(converted)) {
+        return false;
+    }
+
+    if (is_initial_token(typed) || is_initial_token(converted)) {
         return false;
     }
 

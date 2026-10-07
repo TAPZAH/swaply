@@ -192,6 +192,17 @@ int main() {
     expect(!LayoutDetector::should_switch(L"i", L"ш", Translator::Layout::En), "particle_keep_en_pronoun");
     expect(LayoutDetector::should_switch(L"ш", L"i", Translator::Layout::Ru), "particle_ru_to_en_i");
 
+    expect(!LayoutDetector::should_switch(L"awb", Translator::convert(L"awb"), Translator::Layout::En),
+           "term_awb_known_en");
+    expect(!LayoutDetector::should_switch(L"вэд", Translator::convert(L"вэд"), Translator::Layout::Ru),
+           "term_ved_known_ru");
+    expect(!LayoutDetector::should_switch(L"ндс", Translator::convert(L"ндс"), Translator::Layout::Ru),
+           "term_nds_known_ru");
+    expect(!LayoutDetector::should_switch(L"еаэс", Translator::convert(L"еаэс"), Translator::Layout::Ru),
+           "term_eaes_known_ru");
+    expect(!LayoutDetector::should_switch(L"гост", Translator::convert(L"гост"), Translator::Layout::Ru),
+           "term_gost_known_ru");
+
     if (g_failed != 0) {
         std::cerr << g_failed << " test(s) failed\n";
         return 1;

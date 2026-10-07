@@ -178,6 +178,8 @@ constexpr const wchar_t* kEnglish[] = {
     L"writer", L"wrong", L"yeah", L"year", L"yes", L"yesterday", L"yet", L"you",
     L"young", L"your", L"yourself", L"lol", L"omg", L"btw", L"imo", L"idk", L"asap",
     L"github", L"gitlab", L"cmake", L"cursor", L"switch", L"layout", L"keyboard",
+    // ВЭД-аббревиатуры (cdx-group.ru)
+    L"awb", L"cmr", L"msds", L"tir",
 };
 
 constexpr const wchar_t* kEnglishShort[] = {
@@ -240,6 +242,11 @@ constexpr const wchar_t* kRussian[] = {
     L"шесть", L"школа", L"это", L"этого", L"этой", L"этом", L"этот", L"эту", L"я",
     L"язык", L"ясно", L"лол", L"ага", L"угу", L"щас", L"норм", L"спс",
     L"раскладка", L"клавиатура", L"переключить", L"настройка", L"приложение",
+    // ВЭД-аббревиатуры (cdx-group.ru)
+    L"аил", L"асп", L"вчу", L"вэд", L"гатт", L"гост", L"дсс", L"дтс", L"дул",
+    L"еас", L"еаэс", L"елс", L"ескд", L"ест", L"кэк", L"нво", L"ндс", L"нпа",
+    L"нтф", L"опи", L"пдт", L"пкр", L"ркт", L"рови", L"рчц", L"рэс", L"свх",
+    L"сгр", L"ссс", L"сур", L"сэз", L"уил",
 };
 
 constexpr const wchar_t* kRussianShort[] = {

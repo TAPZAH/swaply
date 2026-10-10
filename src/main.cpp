@@ -172,6 +172,17 @@ struct AppState {
     UINT taskbar_created = 0;
     HWND window = nullptr;
     std::atomic<bool> update_check_running{false};
+    // Last word committed by a delimiter (space/Enter/Tab). Lets the manual
+    // convert-word hotkey still fix that word after it has been typed already.
+    std::wstring pending_word;
+    UINT pending_terminator = 0;
+    HWND pending_window = nullptr;
+
+    void clear_pending() noexcept {
+        pending_word.clear();
+        pending_terminator = 0;
+        pending_window = nullptr;
+    }
 };
 
 void start_update_check(AppState& state, bool silent) {
@@ -400,6 +411,7 @@ void drain_key_queue(AppState& state) {
     };
 
     while (state.hook->try_pop(event)) {
+        const std::wstring before = state.tracker->current_word();
         const auto action = state.tracker->on_key(event);
         switch (action) {
         case TextTracker::Action::ConvertWord:
@@ -413,13 +425,43 @@ void drain_key_queue(AppState& state) {
                 deferred_auto_convert = false;
             }
             break;
-        case TextTracker::Action::ConvertSelection:
-            InputSimulator::convert_selection();
-            state.last.clear();
-            if (state.tracker != nullptr) {
-                state.tracker->clear();
+        case TextTracker::Action::ConvertSelection: {
+            // The convert-word hotkey with an empty buffer normally converts the
+            // selection. If a word was just committed by a delimiter, fix that
+            // word instead so the hotkey keeps working right after a space.
+            const bool convert_word_hotkey =
+                state.config != nullptr &&
+                state.config->convert_word.matches(
+                    event.info.vkCode, event.ctrl, event.alt, event.shift, event.win);
+            const HWND target = GetForegroundWindow();
+            bool converted_pending = false;
+            if (convert_word_hotkey && !state.pending_word.empty() &&
+                state.pending_window == target && target != nullptr) {
+                const std::wstring word = state.pending_word;
+                const std::wstring converted = Translator::convert(word);
+                if (!converted.empty() && converted != word) {
+                    const auto source = Translator::infer_layout(word);
+                    const std::size_t delete_count =
+                        word.size() + (state.pending_terminator != 0 ? 1 : 0);
+                    if (InputSimulator::replace_text(
+                            target, delete_count, converted, state.pending_terminator,
+                            Translator::opposite(source))) {
+                        remember_conversion(
+                            state, word, converted, source, state.pending_terminator, target);
+                        converted_pending = true;
+                    }
+                } else {
+                    converted_pending = true;
+                }
+                state.clear_pending();
             }
+            if (!converted_pending) {
+                InputSimulator::convert_selection();
+                state.last.clear();
+            }
+            state.tracker->clear();
             break;
+        }
         case TextTracker::Action::LearnWord:
             learn_current_word(state);
             break;
@@ -443,6 +485,17 @@ void drain_key_queue(AppState& state) {
         if (is_swallowed_delimiter(event) && action != TextTracker::Action::AutoConvert &&
             state.config != nullptr && state.config->enabled && state.config->auto_switch) {
             InputSimulator::send_virtual_key(event.info.vkCode);
+        }
+
+        // Remember the word a delimiter has just committed, or drop it as soon
+        // as any other key invalidates it.
+        if (is_swallowed_delimiter(event) && action == TextTracker::Action::DiscardUndo &&
+            !before.empty()) {
+            state.pending_word = before;
+            state.pending_terminator = event.info.vkCode;
+            state.pending_window = event.target_window;
+        } else {
+            state.clear_pending();
         }
     }
 
@@ -537,6 +590,7 @@ LRESULT CALLBACK hidden_wnd_proc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lpar
                 state->tracker->clear();
             }
             state->last.clear();
+            state->clear_pending();
             return 0;
         }
 

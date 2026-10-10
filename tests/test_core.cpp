@@ -204,6 +204,8 @@ int main() {
            "term_gost_known_ru");
     expect(!LayoutDetector::should_switch(L"тумблер", Translator::convert(L"тумблер"), Translator::Layout::Ru),
            "word_tumbler_kept");
+    expect(!LayoutDetector::should_switch(L"будни", Translator::convert(L"будни"), Translator::Layout::Ru),
+           "word_budni_kept");
     {
         AppConfig tumbler_config{};
         tumbler_config.auto_switch = true;

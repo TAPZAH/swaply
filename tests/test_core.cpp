@@ -234,6 +234,14 @@ int main() {
            "term_ced_known_ru");
     expect(!LayoutDetector::should_switch(L"мапп", Translator::convert(L"мапп"), Translator::Layout::Ru),
            "term_mapp_known_ru");
+    expect(!LayoutDetector::should_switch(L"цту", Translator::convert(L"цту"), Translator::Layout::Ru),
+           "term_ctu_known_ru");
+    expect(!LayoutDetector::should_switch(L"двту", Translator::convert(L"двту"), Translator::Layout::Ru),
+           "term_dvtu_known_ru");
+    expect(!LayoutDetector::should_switch(L"цат", Translator::convert(L"цат"), Translator::Layout::Ru),
+           "term_cat_known_ru");
+    expect(!LayoutDetector::should_switch(L"ап", Translator::convert(L"ап"), Translator::Layout::Ru),
+           "term_ap_known_ru");
 
     if (g_failed != 0) {
         std::cerr << g_failed << " test(s) failed\n";

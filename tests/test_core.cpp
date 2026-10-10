@@ -202,6 +202,22 @@ int main() {
            "term_eaes_known_ru");
     expect(!LayoutDetector::should_switch(L"гост", Translator::convert(L"гост"), Translator::Layout::Ru),
            "term_gost_known_ru");
+    expect(!LayoutDetector::should_switch(L"тумблер", Translator::convert(L"тумблер"), Translator::Layout::Ru),
+           "word_tumbler_kept");
+    {
+        AppConfig tumbler_config{};
+        tumbler_config.auto_switch = true;
+        tumbler_config.ignore_password_fields = false;
+        TextTracker tumbler_tracker(tumbler_config);
+        // "тум" typed in Russian is a valid prefix of "тумблер"/"туман" and must
+        // not be converted early (N/E/V keys in the Russian layout: т/у/м).
+        expect(tumbler_tracker.on_key(key_event('N', ru)) == TextTracker::Action::DiscardUndo,
+               "tumbler_t_typed");
+        expect(tumbler_tracker.on_key(key_event('E', ru)) == TextTracker::Action::DiscardUndo,
+               "tumbler_tu_typed");
+        expect(tumbler_tracker.on_key(key_event('V', ru)) == TextTracker::Action::DiscardUndo,
+               "tumbler_tum_not_early");
+    }
 
     {
         AppConfig fin_config{};

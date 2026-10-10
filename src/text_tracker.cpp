@@ -183,8 +183,12 @@ TextTracker::Action TextTracker::on_key(const HookManager::KeyEvent& event) {
     // letters on, so single/double letter particles still wait for a delimiter.
     const std::size_t min_length =
         config_ != nullptr ? config_->min_word_length : LayoutDetector::min_word_length;
+    const std::wstring typed = current_word();
+    // Do not convert early while the typed prefix is still a valid word-in-
+    // progress in its own language (e.g. "тум" for "тумблер").
     if (config_ != nullptr && config_->auto_switch && glyphs_.size() >= min_length &&
-        LayoutDetector::should_switch(current_word(), converted_word(), source_layout(), min_length)) {
+        !LayoutDetector::is_word_prefix(typed, source_layout()) &&
+        LayoutDetector::should_switch(typed, converted_word(), source_layout(), min_length)) {
         terminator_ = 0;
         return Action::AutoConvert;
     }

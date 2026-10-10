@@ -17,6 +17,9 @@ public:
 
     [[nodiscard]] static bool is_technical_token(std::wstring_view text) noexcept;
     [[nodiscard]] static bool is_exception_word(std::wstring_view text, Translator::Layout layout);
+    // True when text is a valid in-progress word (dictionary prefix) in its own
+    // language; used to avoid an over-eager early conversion.
+    [[nodiscard]] static bool is_word_prefix(std::wstring_view text, Translator::Layout layout);
 
     [[nodiscard]] static bool should_switch(
         std::wstring_view typed,

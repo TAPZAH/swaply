@@ -242,6 +242,7 @@ constexpr const wchar_t* kRussian[] = {
     L"шесть", L"школа", L"это", L"этого", L"этой", L"этом", L"этот", L"эту", L"я",
     L"язык", L"ясно", L"лол", L"ага", L"угу", L"щас", L"норм", L"спс",
     L"раскладка", L"клавиатура", L"переключить", L"настройка", L"приложение",
+    L"тумблер",
     // ВЭД-аббревиатуры (cdx-group.ru)
     L"тн", L"аил", L"асп", L"вчу", L"вэд", L"гатт", L"гост", L"дсс", L"дтс", L"дул",
     L"еас", L"еаэс", L"елс", L"ескд", L"ест", L"кэк", L"нво", L"ндс", L"нпа",
@@ -630,6 +631,13 @@ bool LayoutDetector::is_exception_word(std::wstring_view text, Translator::Layou
         layout = Translator::infer_layout(text);
     }
     return matches_user_exception(text) || matches_xneur_exception(text, layout);
+}
+
+bool LayoutDetector::is_word_prefix(std::wstring_view text, Translator::Layout layout) {
+    if (layout == Translator::Layout::Other) {
+        layout = Translator::infer_layout(text);
+    }
+    return is_dictionary_prefix(letter_core(text), layout);
 }
 
 namespace {

@@ -9,6 +9,7 @@
   "undo_hotkey": "Shift+Pause",
   "start_with_windows": false,
   "check_updates": true,
+  "keep_after_enter_tab": false,
   "excluded_processes": [
     "keepass.exe",
     "keepassxc.exe",

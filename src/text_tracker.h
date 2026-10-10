@@ -36,6 +36,9 @@ public:
     [[nodiscard]] Action on_key(const HookManager::KeyEvent& event);
     void clear() noexcept;
     void assign_converted(std::wstring_view converted);
+    // Keeps the converted word plus its trailing delimiter as one unit so the
+    // convert hotkey can act on it (toggle) until any other key is pressed.
+    void finalize(std::wstring_view converted, UINT terminator);
 
     [[nodiscard]] std::wstring current_word() const;
     [[nodiscard]] std::wstring converted_word() const;
@@ -43,6 +46,7 @@ public:
     [[nodiscard]] bool should_auto_convert() const;
     [[nodiscard]] UINT terminator() const noexcept { return terminator_; }
     [[nodiscard]] bool empty() const noexcept { return glyphs_.empty(); }
+    [[nodiscard]] bool finalized() const noexcept { return finalized_; }
     [[nodiscard]] HWND target_window() const noexcept { return target_window_; }
 
 private:
@@ -50,4 +54,5 @@ private:
     std::vector<Glyph> glyphs_;
     UINT terminator_ = 0;
     HWND target_window_ = nullptr;
+    bool finalized_ = false;
 };

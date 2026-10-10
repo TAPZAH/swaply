@@ -19,6 +19,7 @@ struct AppConfig {
     Hotkey undo_conversion{VK_PAUSE, false, false, true, false};
     bool start_with_windows = false;
     bool check_updates = true;
+    bool keep_after_enter_tab = false;
     std::vector<std::string> excluded_processes;
     std::vector<std::string> extra_en;
     std::vector<std::string> extra_ru;

@@ -14,6 +14,7 @@ public:
     static constexpr UINT undo_command_id = 6;
     static constexpr UINT about_command_id = 7;
     static constexpr UINT update_command_id = 8;
+    static constexpr UINT enter_tab_command_id = 9;
 
     TrayIcon(HINSTANCE instance, HWND window);
     ~TrayIcon();
@@ -23,7 +24,11 @@ public:
     TrayIcon(TrayIcon&&) = delete;
     TrayIcon& operator=(TrayIcon&&) = delete;
 
-    void set_menu_state(bool enabled, bool auto_switch, bool autostart) noexcept;
+    void set_menu_state(
+        bool enabled,
+        bool auto_switch,
+        bool autostart,
+        bool keep_after_enter_tab) noexcept;
 
     // Returns true when the message was handled.
     [[nodiscard]] bool handle_message(UINT msg, WPARAM wparam, LPARAM lparam);
@@ -42,4 +47,5 @@ private:
     bool enabled_ = true;
     bool auto_switch_ = true;
     bool autostart_ = false;
+    bool keep_after_enter_tab_ = false;
 };

@@ -80,10 +80,15 @@ TrayIcon::~TrayIcon() {
     remove();
 }
 
-void TrayIcon::set_menu_state(bool enabled, bool auto_switch, bool autostart) noexcept {
+void TrayIcon::set_menu_state(
+    bool enabled,
+    bool auto_switch,
+    bool autostart,
+    bool keep_after_enter_tab) noexcept {
     enabled_ = enabled;
     auto_switch_ = auto_switch;
     autostart_ = autostart;
+    keep_after_enter_tab_ = keep_after_enter_tab;
     copy_tip(
         data_.szTip,
         std::size(data_.szTip),
@@ -151,8 +156,11 @@ void TrayIcon::show_context_menu() const {
     const UINT start_flags = MF_STRING |
         (is_portable_install() ? (MF_GRAYED | MF_DISABLED) : 0) |
         (autostart_ ? MF_CHECKED : MF_UNCHECKED);
+    const UINT keep_flags = MF_STRING |
+        (keep_after_enter_tab_ ? MF_CHECKED : MF_UNCHECKED);
     if (!AppendMenuW(menu.get(), enabled_flags, enabled_command_id, L"Включено") ||
         !AppendMenuW(menu.get(), auto_flags, auto_switch_command_id, L"Автопереключение") ||
+        !AppendMenuW(menu.get(), keep_flags, enter_tab_command_id, L"Хранить слово после Enter/Tab") ||
         !AppendMenuW(menu.get(), start_flags, autostart_command_id, L"Запускать с Windows") ||
         !AppendMenuW(menu.get(), MF_SEPARATOR, 0, nullptr) ||
         !AppendMenuW(menu.get(), MF_STRING, undo_command_id, L"Отменить конвертацию") ||

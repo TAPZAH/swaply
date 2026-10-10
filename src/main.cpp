@@ -172,17 +172,6 @@ struct AppState {
     UINT taskbar_created = 0;
     HWND window = nullptr;
     std::atomic<bool> update_check_running{false};
-    // Last word committed by a delimiter (space/Enter/Tab). Lets the manual
-    // convert-word hotkey still fix that word after it has been typed already.
-    std::wstring pending_word;
-    UINT pending_terminator = 0;
-    HWND pending_window = nullptr;
-
-    void clear_pending() noexcept {
-        pending_word.clear();
-        pending_terminator = 0;
-        pending_window = nullptr;
-    }
 };
 
 void start_update_check(AppState& state, bool silent) {
@@ -233,7 +222,8 @@ void sync_tray(AppState& state) {
         state.tray->set_menu_state(
             state.config->enabled,
             state.config->auto_switch,
-            state.config->start_with_windows);
+            state.config->start_with_windows,
+            state.config->keep_after_enter_tab);
     }
 }
 
@@ -366,8 +356,12 @@ void convert_current_word(AppState& state, bool auto_convert) {
     const std::wstring converted = tracker.converted_word();
     const auto source = tracker.source_layout();
     const auto target = Translator::opposite(source);
-    const UINT terminator = auto_convert ? tracker.terminator() : 0;
-    const std::size_t delete_count = word.size();
+    const bool was_finalized = tracker.finalized();
+    // A finalized word already has its delimiter in the document, so a manual
+    // conversion must delete it too. An auto conversion at a delimiter had the
+    // delimiter swallowed, so it only deletes the word itself.
+    const UINT terminator = (auto_convert || was_finalized) ? tracker.terminator() : 0;
+    const std::size_t delete_count = word.size() + ((!auto_convert && was_finalized) ? 1 : 0);
 
     if (converted != word) {
         if (!InputSimulator::replace_text(target_window, delete_count, converted, terminator, target)) {
@@ -379,14 +373,16 @@ void convert_current_word(AppState& state, bool auto_convert) {
     } else {
         state.last.clear();
         InputSimulator::activate_layout(target);
+        return;
     }
 
-    if (auto_convert && terminator != 0) {
-        // Word finished at a delimiter: nothing more to append.
-        tracker.clear();
+    if (terminator != 0) {
+        // Word ended at a delimiter (auto) or was converted via the hotkey after
+        // it: keep word + delimiter so the hotkey can keep toggling the layout.
+        tracker.finalize(converted, terminator);
     } else {
-        // Manual conversion or an early prefix match: keep the word so the rest
-        // can be typed in the already switched layout.
+        // Early prefix match: keep the word so the rest can be typed in the
+        // already switched layout.
         tracker.assign_converted(converted);
     }
 }
@@ -411,7 +407,6 @@ void drain_key_queue(AppState& state) {
     };
 
     while (state.hook->try_pop(event)) {
-        const std::wstring before = state.tracker->current_word();
         const auto action = state.tracker->on_key(event);
         switch (action) {
         case TextTracker::Action::ConvertWord:
@@ -425,43 +420,13 @@ void drain_key_queue(AppState& state) {
                 deferred_auto_convert = false;
             }
             break;
-        case TextTracker::Action::ConvertSelection: {
-            // The convert-word hotkey with an empty buffer normally converts the
-            // selection. If a word was just committed by a delimiter, fix that
-            // word instead so the hotkey keeps working right after a space.
-            const bool convert_word_hotkey =
-                state.config != nullptr &&
-                state.config->convert_word.matches(
-                    event.info.vkCode, event.ctrl, event.alt, event.shift, event.win);
-            const HWND target = GetForegroundWindow();
-            bool converted_pending = false;
-            if (convert_word_hotkey && !state.pending_word.empty() &&
-                state.pending_window == target && target != nullptr) {
-                const std::wstring word = state.pending_word;
-                const std::wstring converted = Translator::convert(word);
-                if (!converted.empty() && converted != word) {
-                    const auto source = Translator::infer_layout(word);
-                    const std::size_t delete_count =
-                        word.size() + (state.pending_terminator != 0 ? 1 : 0);
-                    if (InputSimulator::replace_text(
-                            target, delete_count, converted, state.pending_terminator,
-                            Translator::opposite(source))) {
-                        remember_conversion(
-                            state, word, converted, source, state.pending_terminator, target);
-                        converted_pending = true;
-                    }
-                } else {
-                    converted_pending = true;
-                }
-                state.clear_pending();
+        case TextTracker::Action::ConvertSelection:
+            InputSimulator::convert_selection();
+            state.last.clear();
+            if (state.tracker != nullptr) {
+                state.tracker->clear();
             }
-            if (!converted_pending) {
-                InputSimulator::convert_selection();
-                state.last.clear();
-            }
-            state.tracker->clear();
             break;
-        }
         case TextTracker::Action::LearnWord:
             learn_current_word(state);
             break;
@@ -485,17 +450,6 @@ void drain_key_queue(AppState& state) {
         if (is_swallowed_delimiter(event) && action != TextTracker::Action::AutoConvert &&
             state.config != nullptr && state.config->enabled && state.config->auto_switch) {
             InputSimulator::send_virtual_key(event.info.vkCode);
-        }
-
-        // Remember the word a delimiter has just committed, or drop it as soon
-        // as any other key invalidates it.
-        if (is_swallowed_delimiter(event) && action == TextTracker::Action::DiscardUndo &&
-            !before.empty()) {
-            state.pending_word = before;
-            state.pending_terminator = event.info.vkCode;
-            state.pending_window = event.target_window;
-        } else {
-            state.clear_pending();
         }
     }
 
@@ -529,6 +483,11 @@ bool handle_command(AppState& state, HWND hwnd, WPARAM wparam) {
         if (state.hook != nullptr) {
             state.hook->set_eat_delimiters(state.config->enabled && state.config->auto_switch);
         }
+        sync_tray(state);
+        return true;
+    case TrayIcon::enter_tab_command_id:
+        state.config->keep_after_enter_tab = !state.config->keep_after_enter_tab;
+        state.config->save();
         sync_tray(state);
         return true;
     case TrayIcon::undo_command_id:
@@ -590,7 +549,6 @@ LRESULT CALLBACK hidden_wnd_proc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lpar
                 state->tracker->clear();
             }
             state->last.clear();
-            state->clear_pending();
             return 0;
         }
 

@@ -116,6 +116,11 @@ TextTracker::Action TextTracker::on_key(const HookManager::KeyEvent& event) {
         return Action::None;
     }
 
+    // Any real key means the word kept after the last delimiter is left behind.
+    if (finalized_) {
+        clear();
+    }
+
     if (event.ctrl || event.alt || event.win) {
         clear();
         return Action::DiscardUndo;
@@ -138,6 +143,17 @@ TextTracker::Action TextTracker::on_key(const HookManager::KeyEvent& event) {
                 terminator_ = vk;
                 return Action::AutoConvert;
             }
+        }
+
+        // Keep the finished word together with its delimiter so the convert
+        // hotkey can still act on it. Enter/Tab only when enabled in the menu.
+        const bool keep = vk == VK_SPACE ||
+                          (config_ != nullptr && config_->keep_after_enter_tab &&
+                           (vk == VK_RETURN || vk == VK_TAB));
+        if (keep && !glyphs_.empty()) {
+            terminator_ = vk;
+            finalized_ = true;
+            return Action::DiscardUndo;
         }
         clear();
         return Action::DiscardUndo;
@@ -180,6 +196,16 @@ void TextTracker::clear() noexcept {
     glyphs_.clear();
     terminator_ = 0;
     target_window_ = nullptr;
+    finalized_ = false;
+}
+
+void TextTracker::finalize(std::wstring_view converted, UINT terminator) {
+    assign_converted(converted);
+    if (glyphs_.empty()) {
+        return;
+    }
+    terminator_ = terminator;
+    finalized_ = true;
 }
 
 void TextTracker::assign_converted(std::wstring_view converted) {

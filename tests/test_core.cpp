@@ -202,6 +202,42 @@ int main() {
            "term_eaes_known_ru");
     expect(!LayoutDetector::should_switch(L"гост", Translator::convert(L"гост"), Translator::Layout::Ru),
            "term_gost_known_ru");
+
+    {
+        AppConfig fin_config{};
+        fin_config.auto_switch = true;
+        fin_config.ignore_password_fields = false;
+        const UINT hello[] = {'H', 'E', 'L', 'L', 'O'};
+
+        TextTracker space_tracker(fin_config);
+        for (const UINT vk : hello) {
+            static_cast<void>(space_tracker.on_key(key_event(vk, en)));
+        }
+        expect(space_tracker.on_key(key_event(VK_SPACE, en)) == TextTracker::Action::DiscardUndo,
+               "finalize_space_discard");
+        expect(space_tracker.finalized(), "finalize_space_kept");
+        expect_eq(space_tracker.current_word(), L"hello", "finalize_word_kept");
+        expect(space_tracker.on_key(key_event('X', en)) == TextTracker::Action::DiscardUndo,
+               "finalize_type_after");
+        expect(!space_tracker.finalized(), "finalize_reset_on_type");
+
+        TextTracker enter_tracker(fin_config);
+        for (const UINT vk : hello) {
+            static_cast<void>(enter_tracker.on_key(key_event(vk, en)));
+        }
+        expect(enter_tracker.on_key(key_event(VK_RETURN, en)) == TextTracker::Action::DiscardUndo,
+               "enter_discard");
+        expect(!enter_tracker.finalized(), "enter_not_kept_by_default");
+
+        fin_config.keep_after_enter_tab = true;
+        TextTracker enter_keep_tracker(fin_config);
+        for (const UINT vk : hello) {
+            static_cast<void>(enter_keep_tracker.on_key(key_event(vk, en)));
+        }
+        expect(enter_keep_tracker.on_key(key_event(VK_RETURN, en)) == TextTracker::Action::DiscardUndo,
+               "enter_keep_discard");
+        expect(enter_keep_tracker.finalized(), "enter_kept_when_enabled");
+    }
     expect(!LayoutDetector::should_switch(L"тн", Translator::convert(L"тн"), Translator::Layout::Ru),
            "term_tn_known_ru");
     expect(!LayoutDetector::should_switch(L"И.И.", L"B.B.", Translator::Layout::Ru), "initials_ru_kept");

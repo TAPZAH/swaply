@@ -234,6 +234,10 @@ void apply_field(AppConfig& config, const std::string& key, std::string_view tex
         static_cast<void>(parse_bool(text, i, config.check_updates));
         return;
     }
+    if (key == "keep_after_enter_tab") {
+        static_cast<void>(parse_bool(text, i, config.keep_after_enter_tab));
+        return;
+    }
     if (key == "min_word_length") {
         std::size_t value = config.min_word_length;
         if (parse_size(text, i, value) && value >= 2 && value <= 32) {
@@ -544,7 +548,8 @@ bool AppConfig::save() const {
        << "  \"learn_word_hotkey\": \"" << json_escape(learn_word.to_string()) << "\",\n"
        << "  \"undo_hotkey\": \"" << json_escape(undo_conversion.to_string()) << "\",\n"
        << "  \"start_with_windows\": " << (start_with_windows ? "true" : "false") << ",\n"
-       << "  \"check_updates\": " << (check_updates ? "true" : "false") << ",\n";
+       << "  \"check_updates\": " << (check_updates ? "true" : "false") << ",\n"
+       << "  \"keep_after_enter_tab\": " << (keep_after_enter_tab ? "true" : "false") << ",\n";
     write_string_array(ss, "excluded_processes", excluded_processes);
     ss << ",\n";
     write_string_array(ss, "extra_en", extra_en);

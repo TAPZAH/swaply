@@ -212,6 +212,8 @@ constexpr const wchar_t* kEnglish[] = {
     // Игры и медиа
     L"npc", L"mmo", L"rpg", L"pvp", L"pve", L"moba", L"rts", L"tbs", L"dlc", L"rng",
     L"hp", L"mp", L"xp", L"afk", L"cd", L"cs", L"midi", L"wav", L"ogg", L"aac",
+    // География/страны
+    L"usa", L"uk", L"eu", L"un", L"uae", L"ussr", L"cis",
 };
 
 constexpr const wchar_t* kEnglishShort[] = {
@@ -341,6 +343,8 @@ constexpr const wchar_t* kRussian[] = {
     // Игры и медиа
     L"нпс", L"ммо", L"рпг", L"фпс", L"пвп", L"пве", L"моба", L"ртс", L"длс", L"рнг",
     L"хп", L"мп", L"кд", L"кс", L"тв", L"сми", L"нло",
+    // География/страны
+    L"рф", L"ес", L"оаэ", L"сша", L"кнр", L"кндр", L"ссср", L"юар", L"фрг", L"гдр",
 };
 
 constexpr const wchar_t* kRussianShort[] = {

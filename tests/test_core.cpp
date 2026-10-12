@@ -260,6 +260,12 @@ int main() {
            "game_nps_kept");
     expect(!LayoutDetector::should_switch(L"сми", Translator::convert(L"сми"), Translator::Layout::Ru),
            "media_smi_kept");
+    expect(!LayoutDetector::should_switch(L"usa", Translator::convert(L"usa"), Translator::Layout::En),
+           "geo_usa_kept");
+    expect(!LayoutDetector::should_switch(L"сша", Translator::convert(L"сша"), Translator::Layout::Ru),
+           "geo_ssha_kept");
+    expect(!LayoutDetector::should_switch(L"рф", Translator::convert(L"рф"), Translator::Layout::Ru),
+           "geo_rf_kept");
     {
         AppConfig tumbler_config{};
         tumbler_config.auto_switch = true;

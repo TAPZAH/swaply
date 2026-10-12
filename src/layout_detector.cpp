@@ -214,6 +214,10 @@ constexpr const wchar_t* kEnglish[] = {
     L"hp", L"mp", L"xp", L"afk", L"cd", L"cs", L"midi", L"wav", L"ogg", L"aac",
     // География/страны
     L"usa", L"uk", L"eu", L"un", L"uae", L"ussr", L"cis",
+    // Авто и транспорт
+    L"abs", L"esp", L"srs", L"obd", L"vin", L"suv", L"atv", L"cvt", L"rwd", L"fwd", L"awd",
+    L"tdi", L"tsi", L"egr", L"dpf", L"ecu", L"tpms", L"atf", L"gps", L"icao", L"iata",
+    L"ils", L"atc", L"vor",
 };
 
 constexpr const wchar_t* kEnglishShort[] = {
@@ -345,6 +349,8 @@ constexpr const wchar_t* kRussian[] = {
     L"хп", L"мп", L"кд", L"кс", L"тв", L"сми", L"нло",
     // География/страны
     L"рф", L"ес", L"оаэ", L"сша", L"кнр", L"кндр", L"ссср", L"юар", L"фрг", L"гдр",
+    // Авто и транспорт
+    L"двс", L"эбу", L"акпп", L"мкпп", L"тнвд", L"дпс", L"ржд",
 };
 
 constexpr const wchar_t* kRussianShort[] = {

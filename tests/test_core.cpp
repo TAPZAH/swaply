@@ -266,6 +266,12 @@ int main() {
            "geo_ssha_kept");
     expect(!LayoutDetector::should_switch(L"рф", Translator::convert(L"рф"), Translator::Layout::Ru),
            "geo_rf_kept");
+    expect(!LayoutDetector::should_switch(L"abs", Translator::convert(L"abs"), Translator::Layout::En),
+           "auto_abs_kept");
+    expect(!LayoutDetector::should_switch(L"двс", Translator::convert(L"двс"), Translator::Layout::Ru),
+           "auto_dvs_kept");
+    expect(!LayoutDetector::should_switch(L"акпп", Translator::convert(L"акпп"), Translator::Layout::Ru),
+           "auto_akpp_kept");
     {
         AppConfig tumbler_config{};
         tumbler_config.auto_switch = true;

@@ -291,6 +291,12 @@ int main() {
            "food_bzhu_kept");
     expect(!LayoutDetector::should_switch(L"тасс", Translator::convert(L"тасс"), Translator::Layout::Ru),
            "media_tass_kept");
+    expect(!LayoutDetector::should_switch(L"gdpr", Translator::convert(L"gdpr"), Translator::Layout::En),
+           "biz_gdpr_kept");
+    expect(!LayoutDetector::should_switch(L"пвз", Translator::convert(L"пвз"), Translator::Layout::Ru),
+           "biz_pvz_kept");
+    expect(!LayoutDetector::should_switch(L"рпц", Translator::convert(L"рпц"), Translator::Layout::Ru),
+           "rel_rpc_kept");
     expect(!LayoutDetector::should_switch(L"ur", L"гк", Translator::Layout::En), "guard_short_term_kept");
     expect(LayoutDetector::should_switch(L"nj", L"то", Translator::Layout::En), "guard_short_term_converts");
     {

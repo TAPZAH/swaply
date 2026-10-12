@@ -230,6 +230,8 @@ constexpr const wchar_t* kEnglish[] = {
     L"xss", L"ddos", L"mitm", L"ids", L"siem", L"waf", L"pki",
     // Стандарты/сертификация
     L"iec", L"ansi",
+    // Бизнес, HR, торговля
+    L"hr", L"okr", L"iban", L"upc", L"sku", L"ean", L"gdpr",
 };
 
 constexpr const wchar_t* kEnglishShort[] = {
@@ -379,6 +381,22 @@ constexpr const wchar_t* kRussian[] = {
     L"тасс", L"риа", L"есиа", L"смэв", L"фиас",
     // Сельское хозяйство
     L"кфх",
+    // Госорганы и надзор
+    L"рпн", L"рсхн", L"ртн", L"рзн", L"цб",
+    // Госуслуги
+    L"рпгу", L"епгу", L"пгу",
+    // Соцзащита и занятость
+    L"сзн", L"цзн", L"сфр",
+    // Госзакупки
+    L"нмцк", L"окпд", L"еис", L"кру", L"рнп",
+    // Логистика, маркетплейсы, торговля
+    L"тлц", L"пвз", L"чз",
+    // Образование (доп.)
+    L"впр", L"овз",
+    // Медицина (доп.)
+    L"смп", L"сиз",
+    // Религия
+    L"рпц",
 };
 
 constexpr const wchar_t* kRussianShort[] = {

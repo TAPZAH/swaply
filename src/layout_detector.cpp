@@ -220,6 +220,16 @@ constexpr const wchar_t* kEnglish[] = {
     L"ils", L"atc", L"vor",
     // Медицина: психология и диагностика
     L"ptsd", L"adhd", L"ocd", L"asd", L"bmi", L"cpr",
+    // Химия и материалы
+    L"pvc", L"hdpe", L"ldpe", L"pet", L"ptfe",
+    // Электроника и embedded
+    L"pwm", L"rgb", L"spi", L"uart", L"jtag", L"gpio", L"oled", L"dac", L"adc", L"rtc", L"pll",
+    // Программирование
+    L"oop", L"mvc", L"mvvm", L"orm", L"crud", L"dom", L"bom", L"jsx", L"tsx", L"scss", L"wasm",
+    // Безопасность/ИБ
+    L"xss", L"ddos", L"mitm", L"ids", L"siem", L"waf", L"pki",
+    // Стандарты/сертификация
+    L"iec", L"ansi",
 };
 
 constexpr const wchar_t* kEnglishShort[] = {
@@ -359,6 +369,16 @@ constexpr const wchar_t* kRussian[] = {
     // Медицина: психология и диагностика
     L"птср", L"сдвг", L"окр", L"зпр", L"дцп", L"сма", L"рас", L"сд", L"чмт", L"онмк",
     L"ибс", L"имт", L"ад", L"чсс", L"чдд", L"слр", L"орит",
+    // Химия, материалы, экология
+    L"пвх", L"пнд", L"пвд", L"пэт", L"пп", L"абс", L"пдк", L"пдв", L"оопт", L"оос",
+    // Еда, питание
+    L"бжу", L"кбжу", L"ттк",
+    // Электроника
+    L"шим",
+    // Медиа и госорганы
+    L"тасс", L"риа", L"есиа", L"смэв", L"фиас",
+    // Сельское хозяйство
+    L"кфх",
 };
 
 constexpr const wchar_t* kRussianShort[] = {

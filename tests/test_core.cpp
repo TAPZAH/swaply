@@ -281,6 +281,16 @@ int main() {
            "med_ptsd_kept");
     expect(!LayoutDetector::should_switch(L"сдвг", Translator::convert(L"сдвг"), Translator::Layout::Ru),
            "med_sdvg_kept");
+    expect(!LayoutDetector::should_switch(L"pvc", Translator::convert(L"pvc"), Translator::Layout::En),
+           "chem_pvc_kept");
+    expect(!LayoutDetector::should_switch(L"pwm", Translator::convert(L"pwm"), Translator::Layout::En),
+           "hw_pwm_kept");
+    expect(!LayoutDetector::should_switch(L"oop", Translator::convert(L"oop"), Translator::Layout::En),
+           "dev_oop_kept");
+    expect(!LayoutDetector::should_switch(L"бжу", Translator::convert(L"бжу"), Translator::Layout::Ru),
+           "food_bzhu_kept");
+    expect(!LayoutDetector::should_switch(L"тасс", Translator::convert(L"тасс"), Translator::Layout::Ru),
+           "media_tass_kept");
     expect(!LayoutDetector::should_switch(L"ur", L"гк", Translator::Layout::En), "guard_short_term_kept");
     expect(LayoutDetector::should_switch(L"nj", L"то", Translator::Layout::En), "guard_short_term_converts");
     {

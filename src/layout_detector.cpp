@@ -218,6 +218,8 @@ constexpr const wchar_t* kEnglish[] = {
     L"abs", L"esp", L"srs", L"obd", L"vin", L"suv", L"atv", L"cvt", L"rwd", L"fwd", L"awd",
     L"tdi", L"tsi", L"egr", L"dpf", L"ecu", L"tpms", L"atf", L"gps", L"icao", L"iata",
     L"ils", L"atc", L"vor",
+    // Медицина: психология и диагностика
+    L"ptsd", L"adhd", L"ocd", L"asd", L"bmi", L"cpr",
 };
 
 constexpr const wchar_t* kEnglishShort[] = {
@@ -354,6 +356,9 @@ constexpr const wchar_t* kRussian[] = {
     // Недвижимость, земля, ЖКХ
     L"дду", L"бти", L"гкн", L"зу", L"ижс", L"снт", L"днп", L"лпх", L"сро", L"пзз",
     L"гпзу", L"жск", L"тсж", L"одн",
+    // Медицина: психология и диагностика
+    L"птср", L"сдвг", L"окр", L"зпр", L"дцп", L"сма", L"рас", L"сд", L"чмт", L"онмк",
+    L"ибс", L"имт", L"ад", L"чсс", L"чдд", L"слр", L"орит",
 };
 
 constexpr const wchar_t* kRussianShort[] = {

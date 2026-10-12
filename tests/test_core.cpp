@@ -277,6 +277,10 @@ int main() {
     expect(!LayoutDetector::should_switch(L"тсж", Translator::convert(L"тсж"), Translator::Layout::Ru),
            "estate_tszh_kept");
     // Symmetric guard: a common English prefix must not turn into a short term.
+    expect(!LayoutDetector::should_switch(L"ptsd", Translator::convert(L"ptsd"), Translator::Layout::En),
+           "med_ptsd_kept");
+    expect(!LayoutDetector::should_switch(L"сдвг", Translator::convert(L"сдвг"), Translator::Layout::Ru),
+           "med_sdvg_kept");
     expect(!LayoutDetector::should_switch(L"ur", L"гк", Translator::Layout::En), "guard_short_term_kept");
     expect(LayoutDetector::should_switch(L"nj", L"то", Translator::Layout::En), "guard_short_term_converts");
     {

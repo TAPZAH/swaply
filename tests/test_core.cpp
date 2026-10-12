@@ -276,6 +276,9 @@ int main() {
            "estate_izhs_kept");
     expect(!LayoutDetector::should_switch(L"тсж", Translator::convert(L"тсж"), Translator::Layout::Ru),
            "estate_tszh_kept");
+    // Symmetric guard: a common English prefix must not turn into a short term.
+    expect(!LayoutDetector::should_switch(L"ur", L"гк", Translator::Layout::En), "guard_short_term_kept");
+    expect(LayoutDetector::should_switch(L"nj", L"то", Translator::Layout::En), "guard_short_term_converts");
     {
         AppConfig tumbler_config{};
         tumbler_config.auto_switch = true;

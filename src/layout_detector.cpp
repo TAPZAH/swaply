@@ -582,14 +582,22 @@ void ensure_indexes() {
     return contains(extra_for(layout), word) || index_for(layout).contains(word);
 }
 
-[[nodiscard]] bool is_dictionary_prefix(const std::wstring& prefix, Translator::Layout layout) {
-    if (prefix.size() < 3) {
+// Any-length prefix check (used by the symmetric guard for short terms).
+[[nodiscard]] bool dictionary_has_prefix(const std::wstring& prefix, Translator::Layout layout) {
+    if (prefix.empty()) {
         return false;
     }
     if (extra_has_prefix(extra_for(layout), prefix)) {
         return true;
     }
     return index_for(layout).has_prefix(prefix);
+}
+
+[[nodiscard]] bool is_dictionary_prefix(const std::wstring& prefix, Translator::Layout layout) {
+    if (prefix.size() < 3) {
+        return false;
+    }
+    return dictionary_has_prefix(prefix, layout);
 }
 
 [[nodiscard]] std::wstring utf8_to_wide(std::string_view text) {
@@ -853,6 +861,12 @@ namespace {
         return false;
     }
     if (converted_known) {
+        // Symmetric guard: do not switch into a short term (2-3 letters) while
+        // the typed text is still a valid in-progress word of its own language.
+        // Keeps English "cl"/"fl" from turning into Russian "сд"/"ад".
+        if (converted_core.size() <= 3 && dictionary_has_prefix(typed_core, source)) {
+            return false;
+        }
         return true;
     }
 

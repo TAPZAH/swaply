@@ -248,6 +248,12 @@ int main() {
            "law_espch_kept");
     expect(!LayoutDetector::should_switch(L"ип", Translator::convert(L"ип"), Translator::Layout::Ru),
            "law_ip_kept");
+    expect(!LayoutDetector::should_switch(L"imho", Translator::convert(L"imho"), Translator::Layout::En),
+           "net_imho_kept");
+    expect(!LayoutDetector::should_switch(L"лс", Translator::convert(L"лс"), Translator::Layout::Ru),
+           "net_ls_kept");
+    expect(!LayoutDetector::should_switch(L"имхо", Translator::convert(L"имхо"), Translator::Layout::Ru),
+           "net_imho_ru_kept");
     {
         AppConfig tumbler_config{};
         tumbler_config.auto_switch = true;

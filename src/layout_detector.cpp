@@ -207,6 +207,8 @@ constexpr const wchar_t* kEnglish[] = {
     L"kw", L"mw", L"gw", L"kj", L"mj", L"cal", L"kcal", L"pa", L"kpa", L"hpa", L"mpa",
     L"psi", L"kv", L"mv", L"ma", L"ka", L"ohm", L"gb", L"mb", L"kb", L"tb", L"pb",
     L"ms", L"us", L"ns", L"fps", L"ppi", L"bpm", L"rpm", L"mph",
+    // Интернет-сленг и соцсети
+    L"vk", L"tg", L"wa", L"ig", L"fb", L"yt", L"tt", L"dm", L"pm", L"imho", L"tbh",
 };
 
 constexpr const wchar_t* kEnglishShort[] = {
@@ -329,6 +331,10 @@ constexpr const wchar_t* kRussian[] = {
     L"гк", L"ук", L"нк", L"ск", L"зк", L"жк", L"вк", L"лк", L"гпк", L"упк", L"апк",
     L"кас", L"кс", L"вас", L"еспч", L"фссп", L"фз", L"фкз", L"юл", L"фл", L"ип", L"ао",
     L"орд", L"орм", L"сорм", L"сизо", L"уд", L"кдн", L"пдн",
+    // Интернет-сленг и соцсети
+    L"вк", L"тг", L"ва", L"иг", L"фб", L"ют", L"тт", L"дс", L"лс", L"чс", L"чсв", L"хз",
+    L"хд", L"имхо", L"пс", L"ппкс", L"тб", L"омг", L"рофл", L"кек", L"афк", L"пж",
+    L"кмк", L"зы", L"др", L"бб",
 };
 
 constexpr const wchar_t* kRussianShort[] = {

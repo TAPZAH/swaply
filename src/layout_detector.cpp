@@ -197,6 +197,9 @@ constexpr const wchar_t* kEnglish[] = {
     // Спорт
     L"fifa", L"uefa", L"fiba", L"fia", L"nba", L"nhl", L"khl", L"mls", L"atp", L"wta",
     L"mma", L"ufc", L"wada", L"var", L"mvp",
+    // Военное дело
+    L"nato", L"pow", L"sam", L"rpg", L"ied", L"wmd", L"sas", L"swat", L"cia", L"fbi",
+    L"nsa", L"kgb", L"icbm",
 };
 
 constexpr const wchar_t* kEnglishShort[] = {
@@ -300,6 +303,12 @@ constexpr const wchar_t* kRussian[] = {
     L"фк", L"хк", L"бк", L"рфс", L"рпл", L"фнл", L"пфл", L"фхр", L"кхл", L"нхл", L"мхл",
     L"вхл", L"нба", L"уефа", L"фифа", L"мок", L"окр", L"цска", L"мма", L"гто", L"мс", L"кмс",
     L"чм", L"че", L"чр", L"ои", L"лч", L"ле", L"сш",
+    // Военное дело
+    L"вс", L"св", L"вдв", L"вкс", L"вмф", L"рвсн", L"пво", L"про", L"зрк", L"зрпк",
+    L"пзрк", L"бпла", L"сво", L"гсм", L"рэб", L"рхбз", L"мто", L"ттх", L"кп", L"нп",
+    L"ак", L"свд", L"рпг", L"рпк", L"пкм", L"агс", L"птур", L"птрк", L"бтр", L"бмп",
+    L"бмд", L"брдм", L"рсзо", L"сау", L"зсу", L"отрк", L"мбр", L"впк", L"опк", L"втс",
+    L"кб", L"окб", L"нпо", L"гш", L"гру", L"свр", L"фсо", L"вч",
 };
 
 constexpr const wchar_t* kRussianShort[] = {

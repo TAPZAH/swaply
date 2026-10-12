@@ -224,6 +224,12 @@ int main() {
            "sport_cska_kept");
     expect(!LayoutDetector::should_switch(L"че", Translator::convert(L"че"), Translator::Layout::Ru),
            "sport_che_kept");
+    expect(!LayoutDetector::should_switch(L"nato", Translator::convert(L"nato"), Translator::Layout::En),
+           "mil_nato_kept");
+    expect(!LayoutDetector::should_switch(L"вдв", Translator::convert(L"вдв"), Translator::Layout::Ru),
+           "mil_vdv_kept");
+    expect(!LayoutDetector::should_switch(L"бпла", Translator::convert(L"бпла"), Translator::Layout::Ru),
+           "mil_bpla_kept");
     {
         AppConfig tumbler_config{};
         tumbler_config.auto_switch = true;

@@ -272,6 +272,10 @@ int main() {
            "auto_dvs_kept");
     expect(!LayoutDetector::should_switch(L"акпп", Translator::convert(L"акпп"), Translator::Layout::Ru),
            "auto_akpp_kept");
+    expect(!LayoutDetector::should_switch(L"ижс", Translator::convert(L"ижс"), Translator::Layout::Ru),
+           "estate_izhs_kept");
+    expect(!LayoutDetector::should_switch(L"тсж", Translator::convert(L"тсж"), Translator::Layout::Ru),
+           "estate_tszh_kept");
     {
         AppConfig tumbler_config{};
         tumbler_config.auto_switch = true;

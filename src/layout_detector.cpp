@@ -202,6 +202,11 @@ constexpr const wchar_t* kEnglish[] = {
     L"nsa", L"kgb", L"icbm",
     // Наука (физика/химия)
     L"dna", L"rna", L"atp", L"uv", L"ir", L"ph",
+    // Единицы измерения
+    L"kg", L"km", L"mm", L"cm", L"dm", L"nm", L"ml", L"mg", L"hz", L"khz", L"mhz", L"ghz",
+    L"kw", L"mw", L"gw", L"kj", L"mj", L"cal", L"kcal", L"pa", L"kpa", L"hpa", L"mpa",
+    L"psi", L"kv", L"mv", L"ma", L"ka", L"ohm", L"gb", L"mb", L"kb", L"tb", L"pb",
+    L"ms", L"us", L"ns", L"fps", L"ppi", L"bpm", L"rpm", L"mph",
 };
 
 constexpr const wchar_t* kEnglishShort[] = {
@@ -315,6 +320,11 @@ constexpr const wchar_t* kRussian[] = {
     L"эдс", L"кпд", L"си", L"атф", L"мкт", L"ото", L"ик", L"уф", L"нч", L"свч", L"кв",
     L"укв", L"ацп", L"цап", L"ачх", L"фчх", L"кз", L"сгс", L"вак", L"бак", L"оияи",
     L"церн", L"хит", L"эпр", L"ямр",
+    // Единицы измерения
+    L"кг", L"км", L"мм", L"см", L"дм", L"нм", L"мл", L"мг", L"гц", L"кгц", L"мгц", L"ггц",
+    L"вт", L"квт", L"мвт", L"дж", L"кдж", L"кал", L"ккал", L"па", L"кпа", L"мпа",
+    L"кв", L"мв", L"ма", L"ом", L"ком", L"мом", L"гб", L"мб", L"кб", L"тб", L"пб",
+    L"мс", L"мкс", L"нс", L"мин", L"сек", L"сут", L"га",
 };
 
 constexpr const wchar_t* kRussianShort[] = {

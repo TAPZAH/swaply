@@ -254,6 +254,12 @@ int main() {
            "net_ls_kept");
     expect(!LayoutDetector::should_switch(L"имхо", Translator::convert(L"имхо"), Translator::Layout::Ru),
            "net_imho_ru_kept");
+    expect(!LayoutDetector::should_switch(L"npc", Translator::convert(L"npc"), Translator::Layout::En),
+           "game_npc_kept");
+    expect(!LayoutDetector::should_switch(L"нпс", Translator::convert(L"нпс"), Translator::Layout::Ru),
+           "game_nps_kept");
+    expect(!LayoutDetector::should_switch(L"сми", Translator::convert(L"сми"), Translator::Layout::Ru),
+           "media_smi_kept");
     {
         AppConfig tumbler_config{};
         tumbler_config.auto_switch = true;

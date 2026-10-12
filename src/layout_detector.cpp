@@ -209,6 +209,9 @@ constexpr const wchar_t* kEnglish[] = {
     L"ms", L"us", L"ns", L"fps", L"ppi", L"bpm", L"rpm", L"mph",
     // Интернет-сленг и соцсети
     L"vk", L"tg", L"wa", L"ig", L"fb", L"yt", L"tt", L"dm", L"pm", L"imho", L"tbh",
+    // Игры и медиа
+    L"npc", L"mmo", L"rpg", L"pvp", L"pve", L"moba", L"rts", L"tbs", L"dlc", L"rng",
+    L"hp", L"mp", L"xp", L"afk", L"cd", L"cs", L"midi", L"wav", L"ogg", L"aac",
 };
 
 constexpr const wchar_t* kEnglishShort[] = {
@@ -335,6 +338,9 @@ constexpr const wchar_t* kRussian[] = {
     L"вк", L"тг", L"ва", L"иг", L"фб", L"ют", L"тт", L"дс", L"лс", L"чс", L"чсв", L"хз",
     L"хд", L"имхо", L"пс", L"ппкс", L"тб", L"омг", L"рофл", L"кек", L"афк", L"пж",
     L"кмк", L"зы", L"др", L"бб",
+    // Игры и медиа
+    L"нпс", L"ммо", L"рпг", L"фпс", L"пвп", L"пве", L"моба", L"ртс", L"длс", L"рнг",
+    L"хп", L"мп", L"кд", L"кс", L"тв", L"сми", L"нло",
 };
 
 constexpr const wchar_t* kRussianShort[] = {

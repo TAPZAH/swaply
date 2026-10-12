@@ -242,6 +242,12 @@ int main() {
            "unit_km_kept");
     expect(!LayoutDetector::should_switch(L"вт", Translator::convert(L"вт"), Translator::Layout::Ru),
            "unit_vt_kept");
+    expect(!LayoutDetector::should_switch(L"гк", Translator::convert(L"гк"), Translator::Layout::Ru),
+           "law_gk_kept");
+    expect(!LayoutDetector::should_switch(L"еспч", Translator::convert(L"еспч"), Translator::Layout::Ru),
+           "law_espch_kept");
+    expect(!LayoutDetector::should_switch(L"ип", Translator::convert(L"ип"), Translator::Layout::Ru),
+           "law_ip_kept");
     {
         AppConfig tumbler_config{};
         tumbler_config.auto_switch = true;

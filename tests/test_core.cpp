@@ -230,6 +230,12 @@ int main() {
            "mil_vdv_kept");
     expect(!LayoutDetector::should_switch(L"бпла", Translator::convert(L"бпла"), Translator::Layout::Ru),
            "mil_bpla_kept");
+    expect(!LayoutDetector::should_switch(L"dna", Translator::convert(L"dna"), Translator::Layout::En),
+           "sci_dna_kept");
+    expect(!LayoutDetector::should_switch(L"кпд", Translator::convert(L"кпд"), Translator::Layout::Ru),
+           "sci_kpd_kept");
+    expect(!LayoutDetector::should_switch(L"эдс", Translator::convert(L"эдс"), Translator::Layout::Ru),
+           "sci_eds_kept");
     {
         AppConfig tumbler_config{};
         tumbler_config.auto_switch = true;

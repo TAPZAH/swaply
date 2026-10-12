@@ -200,6 +200,8 @@ constexpr const wchar_t* kEnglish[] = {
     // Военное дело
     L"nato", L"pow", L"sam", L"rpg", L"ied", L"wmd", L"sas", L"swat", L"cia", L"fbi",
     L"nsa", L"kgb", L"icbm",
+    // Наука (физика/химия)
+    L"dna", L"rna", L"atp", L"uv", L"ir", L"ph",
 };
 
 constexpr const wchar_t* kEnglishShort[] = {
@@ -309,6 +311,10 @@ constexpr const wchar_t* kRussian[] = {
     L"ак", L"свд", L"рпг", L"рпк", L"пкм", L"агс", L"птур", L"птрк", L"бтр", L"бмп",
     L"бмд", L"брдм", L"рсзо", L"сау", L"зсу", L"отрк", L"мбр", L"впк", L"опк", L"втс",
     L"кб", L"окб", L"нпо", L"гш", L"гру", L"свр", L"фсо", L"вч",
+    // Наука (физика/химия)
+    L"эдс", L"кпд", L"си", L"атф", L"мкт", L"ото", L"ик", L"уф", L"нч", L"свч", L"кв",
+    L"укв", L"ацп", L"цап", L"ачх", L"фчх", L"кз", L"сгс", L"вак", L"бак", L"оияи",
+    L"церн", L"хит", L"эпр", L"ямр",
 };
 
 constexpr const wchar_t* kRussianShort[] = {

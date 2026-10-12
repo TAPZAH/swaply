@@ -180,6 +180,20 @@ constexpr const wchar_t* kEnglish[] = {
     L"github", L"gitlab", L"cmake", L"cursor", L"switch", L"layout", L"keyboard",
     // ВЭД-аббревиатуры (cdx-group.ru)
     L"awb", L"cmr", L"msds", L"tir",
+    // Компьютерные и IT-термины
+    L"ip", L"os", L"db", L"vm", L"ui", L"ux", L"io", L"ai", L"ml", L"id", L"sd", L"hd",
+    L"pc", L"lm", L"vpn", L"dsh", L"ssh", L"ftp", L"tcp", L"udp", L"dns", L"url", L"uri",
+    L"api", L"sdk", L"ide", L"cli", L"gui", L"cpu", L"gpu", L"ram", L"rom", L"ssd", L"hdd",
+    L"usb", L"pci", L"sql", L"xml", L"css", L"php", L"cmd", L"exe", L"dll", L"sys", L"bat",
+    L"gif", L"png", L"jpg", L"mp3", L"mp4", L"avi", L"mkv", L"pdf", L"doc", L"xls", L"zip",
+    L"rar", L"iso", L"img", L"tmp", L"cfg", L"ini", L"reg", L"nat", L"lan", L"wan", L"mac",
+    L"arp", L"ssl", L"tls", L"rdp", L"vnc", L"smb", L"nfs", L"gpt", L"mbr", L"atx", L"psu",
+    L"oem", L"msi", L"kvm", L"ups", L"nas", L"san", L"lcd", L"led", L"vga", L"dvi", L"dpi",
+    L"ips", L"cdn", L"cms", L"crm", L"erp", L"seo", L"ttl", L"qos", L"sla", L"kpi", L"roi",
+    L"ocr", L"csv", L"apk",
+    L"html", L"http", L"json", L"smtp", L"imap", L"ldap", L"sata", L"nvme", L"pcie", L"bios",
+    L"uefi", L"raid", L"ntfs", L"hdmi", L"webp", L"uuid", L"guid", L"grpc", L"saml", L"csrf",
+    L"jpeg", L"tiff", L"flac",
 };
 
 constexpr const wchar_t* kEnglishShort[] = {
@@ -275,6 +289,10 @@ constexpr const wchar_t* kRussian[] = {
     L"цту", L"сзту", L"юту", L"скту", L"уту", L"сту", L"двту", L"цэт", L"цат",
     // Административное правонарушение
     L"ап",
+    // Компьютерные и IT-термины
+    L"ос", L"пк", L"бд", L"иб", L"ит", L"ии", L"цп", L"озу", L"пзу", L"бп", L"ибп", L"мфу",
+    L"бфп", L"арм", L"аис", L"ис", L"сэд", L"эцп", L"скзи", L"ооп", L"инс", L"эвм", L"лвс",
+    L"субд", L"впн", L"веб", L"софт", L"юзер", L"хост",
 };
 
 constexpr const wchar_t* kRussianShort[] = {

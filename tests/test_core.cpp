@@ -206,6 +206,16 @@ int main() {
            "word_tumbler_kept");
     expect(!LayoutDetector::should_switch(L"будни", Translator::convert(L"будни"), Translator::Layout::Ru),
            "word_budni_kept");
+    expect(!LayoutDetector::should_switch(L"vpn", Translator::convert(L"vpn"), Translator::Layout::En),
+           "it_vpn_kept");
+    expect(!LayoutDetector::should_switch(L"json", Translator::convert(L"json"), Translator::Layout::En),
+           "it_json_kept");
+    expect(!LayoutDetector::should_switch(L"dns", Translator::convert(L"dns"), Translator::Layout::En),
+           "it_dns_kept");
+    expect(!LayoutDetector::should_switch(L"ос", Translator::convert(L"ос"), Translator::Layout::Ru),
+           "it_os_kept");
+    expect(!LayoutDetector::should_switch(L"субд", Translator::convert(L"субд"), Translator::Layout::Ru),
+           "it_subd_kept");
     {
         AppConfig tumbler_config{};
         tumbler_config.auto_switch = true;

@@ -216,6 +216,14 @@ int main() {
            "it_os_kept");
     expect(!LayoutDetector::should_switch(L"субд", Translator::convert(L"субд"), Translator::Layout::Ru),
            "it_subd_kept");
+    expect(!LayoutDetector::should_switch(L"fifa", Translator::convert(L"fifa"), Translator::Layout::En),
+           "sport_fifa_kept");
+    expect(!LayoutDetector::should_switch(L"нба", Translator::convert(L"нба"), Translator::Layout::Ru),
+           "sport_nba_kept");
+    expect(!LayoutDetector::should_switch(L"цска", Translator::convert(L"цска"), Translator::Layout::Ru),
+           "sport_cska_kept");
+    expect(!LayoutDetector::should_switch(L"че", Translator::convert(L"че"), Translator::Layout::Ru),
+           "sport_che_kept");
     {
         AppConfig tumbler_config{};
         tumbler_config.auto_switch = true;

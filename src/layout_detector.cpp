@@ -194,6 +194,9 @@ constexpr const wchar_t* kEnglish[] = {
     L"html", L"http", L"json", L"smtp", L"imap", L"ldap", L"sata", L"nvme", L"pcie", L"bios",
     L"uefi", L"raid", L"ntfs", L"hdmi", L"webp", L"uuid", L"guid", L"grpc", L"saml", L"csrf",
     L"jpeg", L"tiff", L"flac",
+    // Спорт
+    L"fifa", L"uefa", L"fiba", L"fia", L"nba", L"nhl", L"khl", L"mls", L"atp", L"wta",
+    L"mma", L"ufc", L"wada", L"var", L"mvp",
 };
 
 constexpr const wchar_t* kEnglishShort[] = {
@@ -293,6 +296,10 @@ constexpr const wchar_t* kRussian[] = {
     L"ос", L"пк", L"бд", L"иб", L"ит", L"ии", L"цп", L"озу", L"пзу", L"бп", L"ибп", L"мфу",
     L"бфп", L"арм", L"аис", L"ис", L"сэд", L"эцп", L"скзи", L"ооп", L"инс", L"эвм", L"лвс",
     L"субд", L"впн", L"веб", L"софт", L"юзер", L"хост",
+    // Спорт
+    L"фк", L"хк", L"бк", L"рфс", L"рпл", L"фнл", L"пфл", L"фхр", L"кхл", L"нхл", L"мхл",
+    L"вхл", L"нба", L"уефа", L"фифа", L"мок", L"окр", L"цска", L"мма", L"гто", L"мс", L"кмс",
+    L"чм", L"че", L"чр", L"ои", L"лч", L"ле", L"сш",
 };
 
 constexpr const wchar_t* kRussianShort[] = {

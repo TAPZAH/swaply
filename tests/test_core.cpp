@@ -222,6 +222,11 @@ int main() {
     expect(!LayoutDetector::should_switch(L"Шереметьево", Translator::convert(L"Шереметьево"),
                                           Translator::Layout::Ru),
            "world_sheremetyevo_kept");
+    // Symbol heuristic: the wrong-layout form of these words shows a Russian
+    // letter that sits on a punctuation key (: [ ] etc.).
+    expect(LayoutDetector::should_switch(L":jubyf", L"Жогина", Translator::Layout::En), "sym_zhogina");
+    expect(LayoutDetector::should_switch(L"j,]trn", L"объект", Translator::Layout::En), "sym_obekt");
+    expect(!LayoutDetector::should_switch(L"hello", L"руддщ", Translator::Layout::En), "sym_keep_hello");
     expect(!LayoutDetector::should_switch(L"vpn", Translator::convert(L"vpn"), Translator::Layout::En),
            "it_vpn_kept");
     expect(!LayoutDetector::should_switch(L"json", Translator::convert(L"json"), Translator::Layout::En),
@@ -348,6 +353,15 @@ int main() {
             last = zhogina.on_key(key_event(vk, ru));
         }
         expect(last == TextTracker::Action::DiscardUndo, "name_zhogina_no_early");
+
+        // Same surname typed in the wrong (English) layout converts early.
+        TextTracker zhogina_en(name_config);
+        auto colon = key_event(VK_OEM_1, en);
+        colon.shift = true;
+        expect(zhogina_en.on_key(colon) == TextTracker::Action::DiscardUndo, "zhogina_en_colon");
+        expect(zhogina_en.on_key(key_event('J', en)) == TextTracker::Action::DiscardUndo, "zhogina_en_j");
+        expect(zhogina_en.on_key(key_event('U', en)) == TextTracker::Action::DiscardUndo, "zhogina_en_u");
+        expect(zhogina_en.on_key(key_event('B', en)) == TextTracker::Action::AutoConvert, "zhogina_en_early");
     }
 
     {

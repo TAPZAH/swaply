@@ -664,6 +664,45 @@ void ensure_indexes() {
     return contains(extra_for(layout), word) || index_for(layout).contains(word);
 }
 
+// Russian letters that live on punctuation keys appear in the English layout as
+// ; : [ ] { } < > ` ~ . Seeing one inside a Latin token is a strong sign the text
+// was typed in the wrong layout (e.g. ":jubyf" -> "Жогина", "j,]trn" -> "объект").
+[[nodiscard]] bool has_russian_key_symbol(std::wstring_view text) noexcept {
+    for (const wchar_t ch : text) {
+        switch (ch) {
+        case L';':
+        case L':':
+        case L'[':
+        case L'{':
+        case L']':
+        case L'}':
+        case L'<':
+        case L'>':
+        case L'`':
+        case L'~':
+            return true;
+        default:
+            break;
+        }
+    }
+    return false;
+}
+
+[[nodiscard]] bool wrong_layout_by_symbols(
+    std::wstring_view typed,
+    std::wstring_view converted,
+    Translator::Layout source) {
+    if (source != Translator::Layout::En || !has_russian_key_symbol(typed)) {
+        return false;
+    }
+    const std::wstring typed_core = letter_core(typed);
+    const std::wstring converted_core = letter_core(converted);
+    if (typed_core.empty() || converted_core == typed_core) {
+        return false;
+    }
+    return !is_known(typed_core, Translator::Layout::En);
+}
+
 // Any-length prefix check (used by the symmetric guard for short terms).
 [[nodiscard]] bool dictionary_has_prefix(const std::wstring& prefix, Translator::Layout layout) {
     if (prefix.empty()) {
@@ -914,6 +953,10 @@ namespace {
         return false;
     }
 
+    if (wrong_layout_by_symbols(typed, converted, source)) {
+        return true;
+    }
+
     const std::wstring typed_core = letter_core(typed);
     const std::wstring converted_core = letter_core(converted);
     if (typed_core.empty() || typed_core == converted_core) {
@@ -1030,6 +1073,10 @@ bool LayoutDetector::should_switch_early(
     }
     if (matches_user_exception(typed) || matches_xneur_exception(typed, source)) {
         return false;
+    }
+
+    if (wrong_layout_by_symbols(typed, converted, source)) {
+        return true;
     }
 
     const std::wstring typed_core = letter_core(typed);

@@ -973,3 +973,49 @@ bool LayoutDetector::should_switch(
     }
     return any_switch;
 }
+
+bool LayoutDetector::should_switch_early(
+    std::wstring_view typed,
+    std::wstring_view converted,
+    Translator::Layout source,
+    std::size_t min_length) {
+    if (source == Translator::Layout::Other) {
+        source = Translator::infer_layout(typed);
+    }
+
+    if (LayoutDetector::is_technical_token(typed) || LayoutDetector::is_technical_token(converted)) {
+        return false;
+    }
+    if (is_initial_token(typed) || is_initial_token(converted)) {
+        return false;
+    }
+    if (matches_user_exception(typed) || matches_xneur_exception(typed, source)) {
+        return false;
+    }
+
+    const std::wstring typed_core = letter_core(typed);
+    const std::wstring converted_core = letter_core(converted);
+    if (typed_core.empty() || typed_core == converted_core) {
+        return false;
+    }
+    if (typed_core.size() < min_length) {
+        return false;
+    }
+
+    const auto target = Translator::opposite(source);
+    if (matches_xneur_exception(converted, target)) {
+        return true;
+    }
+    if (is_known(typed_core, source)) {
+        return false;
+    }
+    // Fire early only when the whole typed text already maps to a known word in
+    // the other layout and is not a valid word-in-progress of its own language.
+    if (converted_core.size() < min_length || !is_known(converted_core, target)) {
+        return false;
+    }
+    if (dictionary_has_prefix(typed_core, source)) {
+        return false;
+    }
+    return true;
+}

@@ -26,4 +26,13 @@ public:
         std::wstring_view converted,
         Translator::Layout source,
         std::size_t min_length = min_word_length);
+
+    // Stricter variant for early (by-prefix) conversion: fires only when the
+    // whole typed text already maps to a known word in the other layout, so that
+    // noisy dictionary prefixes cannot misfire on ordinary words.
+    [[nodiscard]] static bool should_switch_early(
+        std::wstring_view typed,
+        std::wstring_view converted,
+        Translator::Layout source,
+        std::size_t min_length = min_word_length);
 };

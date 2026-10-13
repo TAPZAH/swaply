@@ -143,7 +143,8 @@ int main() {
     TextTracker auto_tracker(auto_config);
     expect(auto_tracker.on_key(key_event('C', en)) == TextTracker::Action::DiscardUndo, "early_c_waits");
     expect(auto_tracker.on_key(key_event('L', en)) == TextTracker::Action::DiscardUndo, "early_cl_waits");
-    expect(auto_tracker.on_key(key_event('T', en)) == TextTracker::Action::AutoConvert, "early_clt_converts");
+    // "clt"/"сде" must NOT convert early (сде is only a prefix), it waits for space.
+    expect(auto_tracker.on_key(key_event('T', en)) == TextTracker::Action::DiscardUndo, "early_clt_no_early");
     expect_eq(auto_tracker.current_word(), L"clt", "early_clt_word_kept");
     expect_eq(auto_tracker.converted_word(), L"сде", "early_clt_converted");
 
@@ -312,6 +313,26 @@ int main() {
                "tumbler_tu_typed");
         expect(tumbler_tracker.on_key(key_event('V', ru)) == TextTracker::Action::DiscardUndo,
                "tumbler_tum_not_early");
+    }
+    {
+        AppConfig name_config{};
+        name_config.auto_switch = true;
+        name_config.ignore_password_fields = false;
+        TextTracker zahar(name_config);
+        const UINT zahar_keys[] = {'P', 'F', VK_OEM_4, 'F', 'H'};
+        TextTracker::Action last = TextTracker::Action::None;
+        for (const UINT vk : zahar_keys) {
+            last = zahar.on_key(key_event(vk, ru));
+        }
+        expect(last == TextTracker::Action::DiscardUndo, "name_zahar_no_early");
+
+        TextTracker zhogina(name_config);
+        const UINT zhogina_keys[] = {VK_OEM_1, 'J', 'U', 'B', 'Y', 'F'};
+        last = TextTracker::Action::None;
+        for (const UINT vk : zhogina_keys) {
+            last = zhogina.on_key(key_event(vk, ru));
+        }
+        expect(last == TextTracker::Action::DiscardUndo, "name_zhogina_no_early");
     }
 
     {

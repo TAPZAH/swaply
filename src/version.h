@@ -1,8 +1,8 @@
 #pragma once
 
-#define SWAPLY_VERSION_COMMA 0, 99, 0, 0
-#define SWAPLY_VERSION_STR "0.99 beta"
-#define SWAPLY_VERSION_STRW L"0.99 beta"
+#define SWAPLY_VERSION_COMMA 0, 990, 0, 0
+#define SWAPLY_VERSION_STR "0.990 beta"
+#define SWAPLY_VERSION_STRW L"0.990 beta"
 #define SWAPLY_AUTHOR "Tap3ah"
 #define SWAPLY_AUTHORW L"Tap3ah"
 #define SWAPLY_PRODUCT "Swaply"

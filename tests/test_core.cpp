@@ -227,6 +227,8 @@ int main() {
     expect(LayoutDetector::should_switch(L":jubyf", L"Жогина", Translator::Layout::En), "sym_zhogina");
     expect(LayoutDetector::should_switch(L"j,]trn", L"объект", Translator::Layout::En), "sym_obekt");
     expect(!LayoutDetector::should_switch(L"hello", L"руддщ", Translator::Layout::En), "sym_keep_hello");
+    expect(Translator::convert(L"crfxfnm") == L"скачать", "dl_convert_skachat");
+    expect(LayoutDetector::should_switch(L"crfxfnm", L"скачать", Translator::Layout::En), "dl_should_skachat");
     expect(!LayoutDetector::should_switch(L"vpn", Translator::convert(L"vpn"), Translator::Layout::En),
            "it_vpn_kept");
     expect(!LayoutDetector::should_switch(L"json", Translator::convert(L"json"), Translator::Layout::En),
@@ -362,6 +364,14 @@ int main() {
         expect(zhogina_en.on_key(key_event('J', en)) == TextTracker::Action::DiscardUndo, "zhogina_en_j");
         expect(zhogina_en.on_key(key_event('U', en)) == TextTracker::Action::DiscardUndo, "zhogina_en_u");
         expect(zhogina_en.on_key(key_event('B', en)) == TextTracker::Action::AutoConvert, "zhogina_en_early");
+
+        // Infinitive "скачать" typed in the wrong layout converts once complete.
+        TextTracker skachat_en(name_config);
+        TextTracker::Action sk_action = TextTracker::Action::DiscardUndo;
+        for (const wchar_t* p = L"CRFXFNM"; *p != L'\0'; ++p) {
+            sk_action = skachat_en.on_key(key_event(*p, en));
+        }
+        expect(sk_action == TextTracker::Action::AutoConvert, "skachat_en_early");
     }
 
     {

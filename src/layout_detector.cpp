@@ -208,7 +208,7 @@ constexpr const wchar_t* kEnglish[] = {
     L"psi", L"kv", L"mv", L"ma", L"ka", L"ohm", L"gb", L"mb", L"kb", L"tb", L"pb",
     L"ms", L"us", L"ns", L"fps", L"ppi", L"bpm", L"rpm", L"mph",
     // Интернет-сленг и соцсети
-    L"vk", L"tg", L"wa", L"ig", L"fb", L"yt", L"tt", L"dm", L"pm", L"imho", L"tbh",
+    L"vk", L"tg", L"wa", L"ig", L"fb", L"tt", L"dm", L"pm", L"imho", L"tbh",
     // Игры и медиа
     L"npc", L"mmo", L"rpg", L"pvp", L"pve", L"moba", L"rts", L"tbs", L"dlc", L"rng",
     L"hp", L"mp", L"xp", L"afk", L"cd", L"cs", L"midi", L"wav", L"ogg", L"aac",
@@ -294,7 +294,7 @@ constexpr const wchar_t* kRussian[] = {
     L"шесть", L"школа", L"это", L"этого", L"этой", L"этом", L"этот", L"эту", L"я",
     L"язык", L"ясно", L"лол", L"ага", L"угу", L"щас", L"норм", L"спс",
     L"раскладка", L"клавиатура", L"переключить", L"настройка", L"приложение",
-    L"тумблер", L"будни",
+    L"тумблер", L"будни", L"нумерация",
     // ВЭД-аббревиатуры (cdx-group.ru)
     L"тн", L"аил", L"асп", L"вчу", L"вэд", L"гатт", L"гост", L"дсс", L"дтс", L"дул",
     L"еас", L"еаэс", L"елс", L"ескд", L"ест", L"кэк", L"нво", L"ндс", L"нпа",

@@ -207,6 +207,9 @@ int main() {
            "word_tumbler_kept");
     expect(!LayoutDetector::should_switch(L"будни", Translator::convert(L"будни"), Translator::Layout::Ru),
            "word_budni_kept");
+    // Typed in the wrong (English) layout, these must switch to Russian.
+    expect(LayoutDetector::should_switch(L"yt", L"не", Translator::Layout::En), "en2ru_ne");
+    expect(LayoutDetector::should_switch(L"yevthfwbz", L"нумерация", Translator::Layout::En), "en2ru_numeraciya");
     expect(!LayoutDetector::should_switch(L"vpn", Translator::convert(L"vpn"), Translator::Layout::En),
            "it_vpn_kept");
     expect(!LayoutDetector::should_switch(L"json", Translator::convert(L"json"), Translator::Layout::En),

@@ -210,6 +210,13 @@ int main() {
     // Typed in the wrong (English) layout, these must switch to Russian.
     expect(LayoutDetector::should_switch(L"yt", L"не", Translator::Layout::En), "en2ru_ne");
     expect(LayoutDetector::should_switch(L"yevthfwbz", L"нумерация", Translator::Layout::En), "en2ru_numeraciya");
+    expect(!LayoutDetector::should_switch(L"Москва", Translator::convert(L"Москва"), Translator::Layout::Ru),
+           "city_moscow_kept");
+    expect(!LayoutDetector::should_switch(L"Владивосток", Translator::convert(L"Владивосток"),
+                                          Translator::Layout::Ru),
+           "city_vladivostok_kept");
+    expect(!LayoutDetector::should_switch(L"Туапсе", Translator::convert(L"Туапсе"), Translator::Layout::Ru),
+           "city_tuapse_kept");
     expect(!LayoutDetector::should_switch(L"vpn", Translator::convert(L"vpn"), Translator::Layout::En),
            "it_vpn_kept");
     expect(!LayoutDetector::should_switch(L"json", Translator::convert(L"json"), Translator::Layout::En),

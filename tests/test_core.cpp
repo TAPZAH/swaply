@@ -217,6 +217,11 @@ int main() {
            "city_vladivostok_kept");
     expect(!LayoutDetector::should_switch(L"Туапсе", Translator::convert(L"Туапсе"), Translator::Layout::Ru),
            "city_tuapse_kept");
+    expect(!LayoutDetector::should_switch(L"Лондон", Translator::convert(L"Лондон"), Translator::Layout::Ru),
+           "world_london_kept");
+    expect(!LayoutDetector::should_switch(L"Шереметьево", Translator::convert(L"Шереметьево"),
+                                          Translator::Layout::Ru),
+           "world_sheremetyevo_kept");
     expect(!LayoutDetector::should_switch(L"vpn", Translator::convert(L"vpn"), Translator::Layout::En),
            "it_vpn_kept");
     expect(!LayoutDetector::should_switch(L"json", Translator::convert(L"json"), Translator::Layout::En),

@@ -229,6 +229,9 @@ int main() {
     expect(!LayoutDetector::should_switch(L"hello", L"руддщ", Translator::Layout::En), "sym_keep_hello");
     expect(Translator::convert(L"crfxfnm") == L"скачать", "dl_convert_skachat");
     expect(LayoutDetector::should_switch(L"crfxfnm", L"скачать", Translator::Layout::En), "dl_should_skachat");
+    // Two-letter dictionary noise must not block common words any more.
+    expect(LayoutDetector::should_switch(L"lf", L"да", Translator::Layout::En), "dropped_noise_lf");
+    expect(!LayoutDetector::should_switch(L"my", L"ьн", Translator::Layout::En), "short_en_kept");
     expect(!LayoutDetector::should_switch(L"vpn", Translator::convert(L"vpn"), Translator::Layout::En),
            "it_vpn_kept");
     expect(!LayoutDetector::should_switch(L"json", Translator::convert(L"json"), Translator::Layout::En),
@@ -362,8 +365,7 @@ int main() {
         colon.shift = true;
         expect(zhogina_en.on_key(colon) == TextTracker::Action::DiscardUndo, "zhogina_en_colon");
         expect(zhogina_en.on_key(key_event('J', en)) == TextTracker::Action::DiscardUndo, "zhogina_en_j");
-        expect(zhogina_en.on_key(key_event('U', en)) == TextTracker::Action::DiscardUndo, "zhogina_en_u");
-        expect(zhogina_en.on_key(key_event('B', en)) == TextTracker::Action::AutoConvert, "zhogina_en_early");
+        expect(zhogina_en.on_key(key_event('U', en)) == TextTracker::Action::AutoConvert, "zhogina_en_early");
 
         // Infinitive "скачать" typed in the wrong layout converts once complete.
         TextTracker skachat_en(name_config);

@@ -63,7 +63,13 @@ bool WordIndex::load_utf8_file(const std::wstring& path) {
                     core.push_back(ch);
                 }
             }
-            add(std::move(core));
+            // Frequency lists carry lots of noise made of one/two letters
+            // ("lf", "vs", "ab", ...). Those junk entries make short Latin
+            // strings look like known words and block conversions. Real short
+            // words live in the curated short lists, so ignore them here.
+            if (core.size() >= 3) {
+                add(std::move(core));
+            }
         }
         current.clear();
     };

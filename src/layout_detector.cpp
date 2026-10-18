@@ -593,6 +593,12 @@ void ensure_indexes() {
     return hits;
 }
 
+// A word that contains a bigram which never occurs in its own language is
+// almost certainly gibberish (i.e. it was typed in the wrong layout).
+[[nodiscard]] bool is_gibberish(const std::wstring& core, Translator::Layout layout) {
+    return proto_hits(core, layout) > 0;
+}
+
 [[nodiscard]] bool looks_like_ipv4(std::wstring_view text) noexcept {
     int dots = 0;
     int group = 0;
@@ -973,6 +979,16 @@ namespace {
     }
 
     const auto target = Translator::opposite(source);
+
+    // After a delimiter: if the typed word is gibberish in its own language but
+    // the other layout gives a real/plausible word, switch even when the typed
+    // string happens to be listed in a noisy frequency dictionary.
+    if (typed_core.size() >= 3 && is_gibberish(typed_core, source) &&
+        !is_gibberish(converted_core, target) &&
+        (is_known(converted_core, target) || looks_like_inflected_word(converted_core, target) ||
+         is_dictionary_prefix(converted_core, target))) {
+        return true;
+    }
 
     if (typed_core.size() == 1 && converted_core.size() == 1) {
         return is_single_letter_word(converted_core[0], target) &&

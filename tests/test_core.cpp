@@ -231,6 +231,12 @@ int main() {
     expect(LayoutDetector::should_switch(L"crfxfnm", L"скачать", Translator::Layout::En), "dl_should_skachat");
     // Two-letter dictionary noise must not block common words any more.
     expect(LayoutDetector::should_switch(L"lf", L"да", Translator::Layout::En), "dropped_noise_lf");
+    expect(LayoutDetector::should_switch(L"bp", L"из", Translator::Layout::En), "dl_should_iz");
+    expect(LayoutDetector::should_switch(L"ds", L"вы", Translator::Layout::En), "dl_should_vy");
+    expect(LayoutDetector::should_switch(L"ult", L"где", Translator::Layout::En), "dl_should_gde");
+    expect(LayoutDetector::should_switch(L"nen", L"тут", Translator::Layout::En), "dl_should_tut");
+    expect(LayoutDetector::should_switch(L"ble", L"иду", Translator::Layout::En), "dl_should_idu");
+    expect(LayoutDetector::should_switch(L"nf", L"та", Translator::Layout::En), "dl_should_ta");
     expect(!LayoutDetector::should_switch(L"my", L"ьн", Translator::Layout::En), "short_en_kept");
     expect(!LayoutDetector::should_switch(L"vpn", Translator::convert(L"vpn"), Translator::Layout::En),
            "it_vpn_kept");

@@ -448,8 +448,9 @@ constexpr const wchar_t* kRussian[] = {
 };
 
 constexpr const wchar_t* kRussianShort[] = {
-    L"бы", L"во", L"да", L"до", L"же", L"за", L"из", L"ли", L"на", L"не", L"ни", L"ну",
-    L"об", L"ок", L"он", L"от", L"по", L"то", L"ты", L"уж",
+    L"бы", L"во", L"вы", L"да", L"до", L"же", L"за", L"из", L"им", L"их", L"ли", L"на",
+    L"не", L"ни", L"ну", L"об", L"ок", L"он", L"от", L"по", L"то", L"ты", L"уж", L"мы",
+    L"ей", L"ею", L"ах", L"ох", L"эх", L"юг", L"яд", L"ум", L"ус", L"та", L"ту",
 };
 
 // Impossible bigrams from xneur (GPL-2.0): share/languages/{en,ru}/proto
@@ -677,6 +678,11 @@ void ensure_indexes() {
 
 [[nodiscard]] bool is_known(const std::wstring& word, Translator::Layout layout) {
     return contains(extra_for(layout), word) || index_for(layout).contains(word);
+}
+
+[[nodiscard]] bool is_common_short_russian(const std::wstring& word) {
+    static const auto set = make_set(kRussianShort);
+    return contains(set, word);
 }
 
 // Russian letters that live on punctuation keys appear in the English layout as
@@ -1011,12 +1017,19 @@ namespace {
         return false;
     }
     if (converted_known) {
-        // Symmetric guard: do not switch into a short term (2-3 letters) while
-        // the typed text is still a valid in-progress word of its own language.
-        // Keeps English "cl"/"fl" from turning into Russian "сд"/"ад".
-        if (converted_core.size() <= 3 && dictionary_has_prefix(typed_core, source)) {
-            return false;
-        }
+    // Symmetric guard for two-letter targets only: do not switch into a short
+    // term while the typed text is still an in-progress word of its own
+    // language. Three-letter targets are not guarded: almost any Latin trigram
+    // is a prefix of some rare word ("ult" -> "ultimate", "nen" -> "nene"),
+    // which blocked frequent Russian words such as "где" and "тут". Very common
+    // two-letter Russian words (из, вы, да, ...) are exempt for the same reason.
+    const bool allow_common_short =
+        typed_core.size() == 2 && target == Translator::Layout::Ru &&
+        is_common_short_russian(converted_core);
+    if (!allow_common_short && converted_core.size() <= 2 &&
+        dictionary_has_prefix(typed_core, source)) {
+        return false;
+    }
         return true;
     }
 

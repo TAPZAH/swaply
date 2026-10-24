@@ -9,6 +9,7 @@ struct UpdateInfo {
     bool check_failed = false;
     std::wstring version;
     std::wstring url;
+    std::wstring notes;
 };
 
 class Updater {

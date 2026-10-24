@@ -21,6 +21,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <cwctype>
 #include <memory>
 #include <stdexcept>
 #include <string>
@@ -188,13 +189,95 @@ void start_update_check(AppState& state, bool silent) {
     }).detach();
 }
 
+[[nodiscard]] std::wstring display_version(std::wstring version) {
+    if (!version.empty() && (version[0] == L'v' || version[0] == L'V')) {
+        version.erase(0, 1);
+    }
+    std::replace(version.begin(), version.end(), L'-', L' ');
+    return version;
+}
+
+[[nodiscard]] std::wstring format_release_notes(std::wstring_view body) {
+    std::wstring_view section = body;
+    constexpr std::wstring_view heading = L"Что нового";
+    const auto heading_pos = section.find(heading);
+    if (heading_pos != std::wstring_view::npos) {
+        section = section.substr(heading_pos + heading.size());
+    }
+    constexpr std::wstring_view footer = L"Горячие клавиши";
+    const auto footer_pos = section.find(footer);
+    if (footer_pos != std::wstring_view::npos) {
+        section = section.substr(0, footer_pos);
+    }
+
+    std::wstring result;
+    std::wstring line;
+    const auto flush = [&]() {
+        std::size_t begin = 0;
+        std::size_t end = line.size();
+        while (begin < end && std::iswspace(line[begin])) {
+            ++begin;
+        }
+        while (end > begin && std::iswspace(line[end - 1])) {
+            --end;
+        }
+
+        std::wstring text;
+        for (std::size_t i = begin; i < end; ++i) {
+            const wchar_t ch = line[i];
+            if (ch == L'`') {
+                continue;
+            }
+            if (ch == L'*' && i + 1 < end && line[i + 1] == L'*') {
+                ++i;
+                continue;
+            }
+            if (ch == L'#' && text.empty()) {
+                continue;
+            }
+            text.push_back(ch);
+        }
+        while (!text.empty() && std::iswspace(text.back())) {
+            text.pop_back();
+        }
+        if (text.empty()) {
+            return;
+        }
+        if (!result.empty()) {
+            result.push_back(L'\n');
+        }
+        result += text;
+    };
+
+    for (const wchar_t ch : section) {
+        if (ch == L'\n') {
+            flush();
+            line.clear();
+        } else if (ch != L'\r') {
+            line.push_back(ch);
+        }
+    }
+    flush();
+
+    constexpr std::size_t max_notes = 1400;
+    if (result.size() > max_notes) {
+        result.resize(max_notes);
+        result += L"…";
+    }
+    return result;
+}
+
 void handle_update_result(AppState& state, const UpdateInfo& info, bool silent) {
     state.update_check_running.store(false);
 
     if (info.available) {
-        const std::wstring text =
-            L"Доступна новая версия Swaply " + info.version +
-            L".\n\nСкачать и установить сейчас? Программа будет закрыта.";
+        std::wstring text =
+            L"Доступна новая версия Swaply " + display_version(info.version) + L".\n\n";
+        const std::wstring notes = format_release_notes(info.notes);
+        if (!notes.empty()) {
+            text += L"Что нового:\n" + notes + L"\n\n";
+        }
+        text += L"Скачать и установить сейчас? Программа будет закрыта.";
         if (MessageBoxW(
                 state.window, text.c_str(), L"Обновление Swaply",
                 MB_YESNO | MB_ICONINFORMATION) == IDYES) {

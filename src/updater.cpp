@@ -166,6 +166,130 @@ private:
     }
 }
 
+[[nodiscard]] bool read_hex4(const std::string& body, std::size_t& pos, unsigned& value) {
+    if (pos + 4 > body.size()) {
+        return false;
+    }
+    unsigned result = 0;
+    for (int i = 0; i < 4; ++i) {
+        const char ch = body[pos++];
+        result <<= 4;
+        if (ch >= '0' && ch <= '9') {
+            result |= static_cast<unsigned>(ch - '0');
+        } else if (ch >= 'a' && ch <= 'f') {
+            result |= static_cast<unsigned>(ch - 'a' + 10);
+        } else if (ch >= 'A' && ch <= 'F') {
+            result |= static_cast<unsigned>(ch - 'A' + 10);
+        } else {
+            return false;
+        }
+    }
+    value = result;
+    return true;
+}
+
+void append_utf8(std::string& out, unsigned code) {
+    if (code < 0x80) {
+        out.push_back(static_cast<char>(code));
+    } else if (code < 0x800) {
+        out.push_back(static_cast<char>(0xC0 | (code >> 6)));
+        out.push_back(static_cast<char>(0x80 | (code & 0x3F)));
+    } else if (code < 0x10000) {
+        out.push_back(static_cast<char>(0xE0 | (code >> 12)));
+        out.push_back(static_cast<char>(0x80 | ((code >> 6) & 0x3F)));
+        out.push_back(static_cast<char>(0x80 | (code & 0x3F)));
+    } else {
+        out.push_back(static_cast<char>(0xF0 | (code >> 18)));
+        out.push_back(static_cast<char>(0x80 | ((code >> 12) & 0x3F)));
+        out.push_back(static_cast<char>(0x80 | ((code >> 6) & 0x3F)));
+        out.push_back(static_cast<char>(0x80 | (code & 0x3F)));
+    }
+}
+
+[[nodiscard]] std::string json_unescape(const std::string& body, std::size_t pos) {
+    std::string out;
+    while (pos < body.size()) {
+        const char ch = body[pos++];
+        if (ch == '"') {
+            break;
+        }
+        if (ch != '\\') {
+            out.push_back(ch);
+            continue;
+        }
+        if (pos >= body.size()) {
+            break;
+        }
+        const char esc = body[pos++];
+        switch (esc) {
+        case '"':
+            out.push_back('"');
+            break;
+        case '\\':
+            out.push_back('\\');
+            break;
+        case '/':
+            out.push_back('/');
+            break;
+        case 'b':
+            out.push_back('\b');
+            break;
+        case 'f':
+            out.push_back('\f');
+            break;
+        case 'n':
+            out.push_back('\n');
+            break;
+        case 'r':
+            out.push_back('\r');
+            break;
+        case 't':
+            out.push_back('\t');
+            break;
+        case 'u': {
+            unsigned code = 0;
+            if (!read_hex4(body, pos, code)) {
+                return out;
+            }
+            if (code >= 0xD800 && code <= 0xDBFF && pos + 6 <= body.size() &&
+                body[pos] == '\\' && body[pos + 1] == 'u') {
+                const std::size_t saved = pos;
+                pos += 2;
+                unsigned low = 0;
+                if (read_hex4(body, pos, low) && low >= 0xDC00 && low <= 0xDFFF) {
+                    code = 0x10000 + ((code - 0xD800) << 10) + (low - 0xDC00);
+                } else {
+                    pos = saved;
+                }
+            }
+            append_utf8(out, code);
+            break;
+        }
+        default:
+            out.push_back(esc);
+            break;
+        }
+    }
+    return out;
+}
+
+[[nodiscard]] std::string json_release_body(const std::string& body) {
+    const std::string key = "\"body\":";
+    const auto position = body.find(key);
+    if (position == std::string::npos) {
+        return {};
+    }
+    std::size_t pos = position + key.size();
+    while (pos < body.size() &&
+           (body[pos] == ' ' || body[pos] == '\t' || body[pos] == '\n' || body[pos] == '\r')) {
+        ++pos;
+    }
+    if (pos >= body.size() || body[pos] != '"') {
+        return {};
+    }
+    return json_unescape(body, pos + 1);
+}
+
 [[nodiscard]] std::array<int, 3> parse_version(std::wstring_view text) {
     std::array<int, 3> parts{0, 0, 0};
     int index = 0;
@@ -229,6 +353,7 @@ UpdateInfo Updater::check() {
     info.available = true;
     info.version = version;
     info.url = utf8_to_wide(url);
+    info.notes = utf8_to_wide(json_release_body(body));
     return info;
 }
 

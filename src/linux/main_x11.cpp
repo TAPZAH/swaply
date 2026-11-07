@@ -5,8 +5,8 @@
 // in the wrong EN/RU layout and retypes them with XTest while switching the
 // XKB group. Wayland is not supported.
 
+#include "config_linux.h"
 #include "layout_detector.h"
-#include "utf8.h"
 #include "version.h"
 
 #include <X11/XKBlib.h>
@@ -15,7 +15,9 @@
 #include <X11/extensions/record.h>
 #include <X11/keysym.h>
 
+#include <atomic>
 #include <cctype>
+#include <chrono>
 #include <csignal>
 #include <cstdio>
 #include <cstdlib>
@@ -23,10 +25,12 @@
 #include <filesystem>
 #include <fstream>
 #include <iterator>
+#include <mutex>
 #include <optional>
 #include <set>
 #include <sstream>
 #include <string>
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -44,36 +48,6 @@ struct Hotkey {
     [[nodiscard]] bool valid() const noexcept { return sym != NoSymbol; }
 };
 
-struct Config {
-    bool enabled = true;
-    bool auto_switch = true;
-    std::size_t min_word_length = 3;
-    bool start_with_windows = false;
-    Hotkey convert_word{false, false, false, false, XK_Pause};
-    std::string convert_word_text = "Pause";
-    std::vector<std::string> extra_en;
-    std::vector<std::string> extra_ru;
-    std::vector<std::string> exceptions;
-};
-
-[[nodiscard]] std::string read_all(const std::string& path) {
-    std::ifstream in(path, std::ios::binary);
-    if (!in) {
-        return {};
-    }
-    return std::string(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
-}
-
-[[nodiscard]] std::string config_directory() {
-    if (const char* xdg = std::getenv("XDG_CONFIG_HOME"); xdg != nullptr && *xdg != '\0') {
-        return std::string(xdg) + "/swaply";
-    }
-    if (const char* home = std::getenv("HOME"); home != nullptr && *home != '\0') {
-        return std::string(home) + "/.config/swaply";
-    }
-    return ".swaply";
-}
-
 [[nodiscard]] std::string trim_copy(const std::string& text) {
     std::size_t begin = 0;
     std::size_t end = text.size();
@@ -84,112 +58,6 @@ struct Config {
         --end;
     }
     return text.substr(begin, end - begin);
-}
-
-[[nodiscard]] std::size_t key_position(const std::string& text, const std::string& key) {
-    return text.find("\"" + key + "\"");
-}
-
-[[nodiscard]] bool parse_bool(const std::string& text, const std::string& key, bool fallback) {
-    std::size_t pos = key_position(text, key);
-    if (pos == std::string::npos) {
-        return fallback;
-    }
-    pos = text.find(':', pos);
-    if (pos == std::string::npos) {
-        return fallback;
-    }
-    const std::size_t yes = text.find("true", pos);
-    const std::size_t no = text.find("false", pos);
-    if (yes != std::string::npos && (no == std::string::npos || yes < no)) {
-        return true;
-    }
-    if (no != std::string::npos) {
-        return false;
-    }
-    return fallback;
-}
-
-[[nodiscard]] long parse_int(const std::string& text, const std::string& key, long fallback) {
-    std::size_t pos = key_position(text, key);
-    if (pos == std::string::npos) {
-        return fallback;
-    }
-    pos = text.find(':', pos);
-    if (pos == std::string::npos) {
-        return fallback;
-    }
-    ++pos;
-    while (pos < text.size() && std::isspace(static_cast<unsigned char>(text[pos]))) {
-        ++pos;
-    }
-    char* end = nullptr;
-    const long value = std::strtol(text.c_str() + pos, &end, 10);
-    if (end == text.c_str() + pos) {
-        return fallback;
-    }
-    return value;
-}
-
-[[nodiscard]] std::string parse_string(const std::string& text, const std::string& key, const std::string& fallback) {
-    std::size_t pos = key_position(text, key);
-    if (pos == std::string::npos) {
-        return fallback;
-    }
-    pos = text.find(':', pos);
-    if (pos == std::string::npos) {
-        return fallback;
-    }
-    pos = text.find('"', pos + 1);
-    if (pos == std::string::npos) {
-        return fallback;
-    }
-    std::string value;
-    for (++pos; pos < text.size(); ++pos) {
-        const char ch = text[pos];
-        if (ch == '\\' && pos + 1 < text.size()) {
-            value.push_back(text[++pos]);
-            continue;
-        }
-        if (ch == '"') {
-            return value;
-        }
-        value.push_back(ch);
-    }
-    return fallback;
-}
-
-[[nodiscard]] std::vector<std::string> parse_string_array(const std::string& text, const std::string& key) {
-    std::vector<std::string> result;
-    std::size_t pos = key_position(text, key);
-    if (pos == std::string::npos) {
-        return result;
-    }
-    pos = text.find('[', pos);
-    if (pos == std::string::npos) {
-        return result;
-    }
-    while (pos < text.size() && text[pos] != ']') {
-        if (text[pos] != '"') {
-            ++pos;
-            continue;
-        }
-        std::string value;
-        for (++pos; pos < text.size(); ++pos) {
-            const char ch = text[pos];
-            if (ch == '\\' && pos + 1 < text.size()) {
-                value.push_back(text[++pos]);
-                continue;
-            }
-            if (ch == '"') {
-                break;
-            }
-            value.push_back(ch);
-        }
-        result.push_back(std::move(value));
-        ++pos;
-    }
-    return result;
 }
 
 [[nodiscard]] KeySym key_name_to_sym(const std::string& name) {
@@ -231,67 +99,6 @@ struct Config {
         }
     }
     return hotkey;
-}
-
-[[nodiscard]] Config load_config() {
-    Config config;
-    const std::string dir = config_directory();
-    std::error_code error;
-    std::filesystem::create_directories(dir, error);
-
-    const std::string path = dir + "/config.json";
-    const std::string text = read_all(path);
-    if (text.empty()) {
-        return config;
-    }
-
-    config.enabled = parse_bool(text, "enabled", config.enabled);
-    config.auto_switch = parse_bool(text, "auto_switch", config.auto_switch);
-    config.start_with_windows = parse_bool(text, "start_with_windows", config.start_with_windows);
-    const long min_length = parse_int(text, "min_word_length", static_cast<long>(config.min_word_length));
-    if (min_length >= 1 && min_length <= 8) {
-        config.min_word_length = static_cast<std::size_t>(min_length);
-    }
-    config.convert_word_text = parse_string(text, "convert_word_hotkey", config.convert_word_text);
-    config.convert_word = parse_hotkey(config.convert_word_text);
-    config.extra_en = parse_string_array(text, "extra_en");
-    config.extra_ru = parse_string_array(text, "extra_ru");
-    config.exceptions = parse_string_array(text, "exceptions");
-    return config;
-}
-
-[[nodiscard]] std::string executable_path() {
-    char path[4096]{};
-    const ssize_t length = readlink("/proc/self/exe", path, sizeof(path) - 1);
-    if (length <= 0) {
-        return {};
-    }
-    return std::string(path, static_cast<std::size_t>(length));
-}
-
-void apply_autostart(bool enabled) {
-    const char* home = std::getenv("HOME");
-    if (home == nullptr || *home == '\0') {
-        return;
-    }
-    const std::string dir = std::string(home) + "/.config/autostart";
-    const std::string path = dir + "/swaply.desktop";
-    std::error_code error;
-    if (!enabled) {
-        std::filesystem::remove(path, error);
-        return;
-    }
-    std::filesystem::create_directories(dir, error);
-    std::ofstream out(path, std::ios::binary | std::ios::trunc);
-    if (!out) {
-        return;
-    }
-    out << "[Desktop Entry]\n"
-        << "Type=Application\n"
-        << "Name=Swaply\n"
-        << "Comment=EN/RU layout switcher\n"
-        << "Exec=" << executable_path() << "\n"
-        << "X-GNOME-Autostart-enabled=true\n";
 }
 
 [[nodiscard]] unsigned keysym_to_ucs(KeySym sym) noexcept {
@@ -351,7 +158,7 @@ struct PendingConvert {
 
 class X11App {
 public:
-    X11App(Display* display, Config config)
+    X11App(Display* display, LinuxConfig config)
         : display_(display), config_(std::move(config)) {}
 
     void init_keys() {
@@ -400,6 +207,15 @@ public:
 
     void set_context(XRecordContext context) noexcept { context_ = context; }
 
+    void apply_config(const LinuxConfig& config) {
+        std::lock_guard<std::mutex> lock(mutex_);
+        config_ = config;
+        hotkey_ = parse_hotkey(config_.convert_word_hotkey);
+        LayoutDetector::set_user_words(config_.extra_en, config_.extra_ru);
+        LayoutDetector::set_exceptions(config_.exceptions);
+        apply_autostart(config_.start_with_windows);
+    }
+
     void handle_key(KeyCode keycode, unsigned int state, bool pressed) {
         if (wait_release_) {
             if (!pressed && keycode == wait_release_key_) {
@@ -417,6 +233,13 @@ public:
         if (pending_.has_value()) {
             return;
         }
+
+        std::lock_guard<std::mutex> lock(mutex_);
+        if (!config_.enabled) {
+            word_.clear();
+            return;
+        }
+
         const bool ctrl = (state & ControlMask) != 0;
         const bool shift = (state & ShiftMask) != 0;
         const bool alt = (state & Mod1Mask) != 0;
@@ -424,7 +247,7 @@ public:
         const bool caps = (state & LockMask) != 0;
         const int group = XkbGroupForCoreState(state);
 
-        if (matches_hotkey(config_.convert_word, keycode, ctrl, alt, shift, super)) {
+        if (matches_hotkey(hotkey_, keycode, ctrl, alt, shift, super)) {
             convert_current(0, false, group);
             return;
         }
@@ -521,7 +344,7 @@ private:
     }
 
     void handle_delimiter(KeyCode keycode, bool shift, int group) {
-        if (config_.enabled && config_.auto_switch && !word_.empty()) {
+        if (config_.auto_switch && !word_.empty()) {
             convert_current(keycode, shift, group);
         } else {
             word_.clear();
@@ -564,8 +387,6 @@ private:
         word_.clear();
 
         if (terminator != 0) {
-            // Wait for the delimiter to be released before injecting, otherwise
-            // the retyped space/enter may be swallowed by the still-held key.
             wait_release_ = true;
             wait_release_key_ = terminator;
         } else if (context_ != 0) {
@@ -588,7 +409,9 @@ private:
     }
 
     Display* display_ = nullptr;
-    Config config_;
+    LinuxConfig config_;
+    Hotkey hotkey_;
+    mutable std::mutex mutex_;
     int en_group_ = -1;
     int ru_group_ = -1;
     std::vector<Glyph> word_;
@@ -620,6 +443,32 @@ void record_callback(XPointer closure, XRecordInterceptData* data) {
     XRecordFreeData(data);
 }
 
+void write_pid_file() {
+    std::error_code error;
+    std::filesystem::create_directories(config_directory(), error);
+    std::ofstream out(config_directory() + "/swaply.pid", std::ios::trunc);
+    if (out) {
+        out << static_cast<long>(getpid());
+    }
+}
+
+void watch_config(X11App& app) {
+    std::error_code error;
+    auto last = std::filesystem::last_write_time(config_path(), error);
+    for (;;) {
+        std::this_thread::sleep_for(std::chrono::seconds(2));
+        std::error_code current_error;
+        const auto current = std::filesystem::last_write_time(config_path(), current_error);
+        if (current_error) {
+            continue;
+        }
+        if (current != last) {
+            last = current;
+            app.apply_config(load_config());
+        }
+    }
+}
+
 }  // namespace
 
 int main() {
@@ -627,16 +476,13 @@ int main() {
     std::signal(SIGINT, [](int) { std::_Exit(0); });
     std::signal(SIGTERM, [](int) { std::_Exit(0); });
 
-    Config config = load_config();
-    if (!config.enabled) {
-        std::fprintf(stderr, "Swaply: disabled in config\n");
-        return 0;
-    }
+    LinuxConfig config = load_config();
 
     LayoutDetector::load_bundled_dictionaries();
     LayoutDetector::set_user_words(config.extra_en, config.extra_ru);
     LayoutDetector::set_exceptions(config.exceptions);
     apply_autostart(config.start_with_windows);
+    write_pid_file();
 
     Display* control = XOpenDisplay(nullptr);
     if (control == nullptr) {
@@ -675,6 +521,7 @@ int main() {
         std::fprintf(stderr, "Swaply: both EN and RU keyboard layouts must be present in the XKB group list\n");
         return 1;
     }
+    app.apply_config(config);
 
     XRecordRange* range = XRecordAllocRange();
     if (range == nullptr) {
@@ -693,6 +540,8 @@ int main() {
     }
     XSync(control, False);
     app.set_context(context);
+
+    std::thread(watch_config, std::ref(app)).detach();
 
     std::fprintf(stderr, "Swaply %s (X11) started\n", SWAPLY_VERSION_STR);
 

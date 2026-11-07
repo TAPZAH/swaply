@@ -126,6 +126,7 @@ endif()
 
 add_executable(swaply-x11
     src/linux/main_x11.cpp
+    src/linux/config_linux.cpp
     src/utf8.cpp
     src/layout_detector.cpp
     src/word_index.cpp
@@ -145,8 +146,30 @@ target_link_libraries(swaply-x11 PRIVATE
 
 target_compile_options(swaply-x11 PRIVATE -Wall -Wextra -Wpedantic)
 
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(GTK3 REQUIRED gtk+-3.0)
+
+add_executable(swaply-tray
+    src/linux/tray_x11.cpp
+    src/linux/config_linux.cpp
+)
+
+target_include_directories(swaply-tray PRIVATE
+    src
+    ${GTK3_INCLUDE_DIRS}
+)
+
+target_link_libraries(swaply-tray PRIVATE ${GTK3_LIBRARIES})
+
+target_compile_options(swaply-tray PRIVATE
+    ${GTK3_CFLAGS_OTHER}
+    -Wall
+    -Wextra
+    -Wno-deprecated-declarations
+)
+
 include(GNUInstallDirs)
-install(TARGETS swaply-x11 RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+install(TARGETS swaply-x11 swaply-tray RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 install(DIRECTORY assets/dict DESTINATION ${CMAKE_INSTALL_DATADIR}/swaply)
 install(FILES assets/default_config.json DESTINATION ${CMAKE_INSTALL_DATADIR}/swaply)
 

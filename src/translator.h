@@ -1,6 +1,8 @@
 #pragma once
 
+#ifdef _WIN32
 #include <Windows.h>
+#endif
 
 #include <optional>
 #include <string>
@@ -14,17 +16,19 @@ public:
         Other,
     };
 
+#ifdef _WIN32
     [[nodiscard]] static Layout detect_layout(HKL hkl) noexcept;
+#endif
     [[nodiscard]] static Layout infer_layout(std::wstring_view text) noexcept;
     [[nodiscard]] static Layout opposite(Layout layout) noexcept;
 
     struct PhysicalKey {
-        UINT vk = 0;
+        unsigned int vk = 0;
         bool shift = false;
     };
 
     [[nodiscard]] static std::optional<wchar_t> char_from_vk(
-        UINT vk,
+        unsigned int vk,
         bool shift,
         bool caps,
         Layout layout) noexcept;

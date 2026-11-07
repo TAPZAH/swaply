@@ -6,6 +6,8 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+if(WIN32)
+
 add_executable(Swaply
     src/main.cpp
     src/config.cpp
@@ -15,6 +17,7 @@ add_executable(Swaply
     src/translator.cpp
     src/layout_detector.cpp
     src/word_index.cpp
+    src/utf8.cpp
     src/focus_guard.cpp
     src/input_sim.cpp
     src/updater.cpp
@@ -70,7 +73,7 @@ else()
 endif()
 
 if(MINGW)
-    target_link_options(Swaply PRIVATE -municode)
+    target_link_options(Swaply PRIVATE -municode -static)
 endif()
 
 add_executable(swaply_tests
@@ -78,6 +81,7 @@ add_executable(swaply_tests
     src/translator.cpp
     src/layout_detector.cpp
     src/word_index.cpp
+    src/utf8.cpp
     src/hotkey.cpp
     src/text_tracker.cpp
     src/focus_guard.cpp
@@ -106,5 +110,44 @@ else()
     target_compile_options(swaply_tests PRIVATE -Wall -Wextra -Wpedantic)
 endif()
 
+if(MINGW)
+    target_link_options(swaply_tests PRIVATE -static)
+endif()
+
 enable_testing()
 add_test(NAME Swaply_core COMMAND swaply_tests)
+
+elseif(UNIX)
+
+find_package(X11 REQUIRED)
+if(NOT X11_Xtst_FOUND)
+    message(FATAL_ERROR "libXtst is required for XRecord/XTest")
+endif()
+
+add_executable(swaply-x11
+    src/linux/main_x11.cpp
+    src/utf8.cpp
+    src/layout_detector.cpp
+    src/word_index.cpp
+    src/translator.cpp
+)
+
+target_include_directories(swaply-x11 PRIVATE
+    src
+    ${X11_INCLUDE_DIR}
+    ${X11_Xtst_INCLUDE_PATH}
+)
+
+target_link_libraries(swaply-x11 PRIVATE
+    ${X11_LIBRARIES}
+    ${X11_Xtst_LIB}
+)
+
+target_compile_options(swaply-x11 PRIVATE -Wall -Wextra -Wpedantic)
+
+include(GNUInstallDirs)
+install(TARGETS swaply-x11 RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+install(DIRECTORY assets/dict DESTINATION ${CMAKE_INSTALL_DATADIR}/swaply)
+install(FILES assets/default_config.json DESTINATION ${CMAKE_INSTALL_DATADIR}/swaply)
+
+endif()

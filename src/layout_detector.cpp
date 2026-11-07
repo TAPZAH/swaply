@@ -1,11 +1,17 @@
 #include "layout_detector.h"
 
+#include "utf8.h"
 #include "word_index.h"
 
 #include <algorithm>
+#include <cstdlib>
 #include <string>
 #include <unordered_set>
 #include <vector>
+
+#ifndef _WIN32
+#include <unistd.h>
+#endif
 
 namespace {
 
@@ -742,19 +748,6 @@ void ensure_indexes() {
     return dictionary_has_prefix(prefix, layout);
 }
 
-[[nodiscard]] std::wstring utf8_to_wide(std::string_view text) {
-    if (text.empty()) {
-        return {};
-    }
-    const int needed = MultiByteToWideChar(CP_UTF8, 0, text.data(), static_cast<int>(text.size()), nullptr, 0);
-    if (needed <= 0) {
-        return {};
-    }
-    std::wstring wide(static_cast<std::size_t>(needed), L'\0');
-    MultiByteToWideChar(CP_UTF8, 0, text.data(), static_cast<int>(text.size()), wide.data(), needed);
-    return wide;
-}
-
 [[nodiscard]] bool looks_like_url_or_email(std::wstring_view text) noexcept {
     bool has_at = false;
     bool has_colon = false;
@@ -793,6 +786,71 @@ void ensure_indexes() {
     return letters >= 6 && digits >= 3 && digits * 2 >= letters;
 }
 
+[[nodiscard]] std::wstring executable_directory() {
+#ifdef _WIN32
+    wchar_t path[MAX_PATH]{};
+    const DWORD length = GetModuleFileNameW(nullptr, path, MAX_PATH);
+    if (length == 0 || length >= MAX_PATH) {
+        return {};
+    }
+    std::wstring dir = path;
+#else
+    char path[4096]{};
+    const ssize_t length = readlink("/proc/self/exe", path, sizeof(path) - 1);
+    if (length <= 0) {
+        return {};
+    }
+    std::wstring dir = utf8_to_wide(std::string(path, static_cast<std::size_t>(length)));
+#endif
+    const auto slash = dir.find_last_of(L"\\/");
+    if (slash == std::wstring::npos) {
+        return {};
+    }
+    dir.resize(slash);
+    return dir;
+}
+
+[[nodiscard]] wchar_t path_separator() noexcept {
+#ifdef _WIN32
+    return L'\\';
+#else
+    return L'/';
+#endif
+}
+
+[[nodiscard]] std::wstring dictionary_directory() {
+#ifdef _WIN32
+    wchar_t value[MAX_PATH]{};
+    const DWORD length = GetEnvironmentVariableW(L"SWAPLY_DICT_DIR", value, MAX_PATH);
+    if (length > 0 && length < MAX_PATH) {
+        return value;
+    }
+    const std::wstring base = executable_directory();
+    if (base.empty()) {
+        return {};
+    }
+    return base + L"\\dict";
+#else
+    if (const char* value = std::getenv("SWAPLY_DICT_DIR"); value != nullptr && *value != '\0') {
+        return utf8_to_wide(value);
+    }
+    std::vector<std::wstring> candidates;
+    const std::wstring base = executable_directory();
+    if (!base.empty()) {
+        candidates.push_back(base + L"/dict");
+    }
+    candidates.push_back(L"/usr/local/share/swaply/dict");
+    candidates.push_back(L"/usr/share/swaply/dict");
+    candidates.push_back(L"dict");
+    for (const auto& dir : candidates) {
+        if (access(wide_to_utf8(dir).c_str(), R_OK) == 0) {
+            return dir;
+        }
+    }
+    return candidates.front();
+#endif
+}
+
 }  // namespace
 
 bool LayoutDetector::is_technical_token(std::wstring_view text) noexcept {
@@ -802,21 +860,14 @@ bool LayoutDetector::is_technical_token(std::wstring_view text) noexcept {
 void LayoutDetector::load_bundled_dictionaries() {
     ensure_indexes();
 
-    wchar_t path[MAX_PATH]{};
-    const DWORD length = GetModuleFileNameW(nullptr, path, MAX_PATH);
-    if (length == 0 || length >= MAX_PATH) {
+    const std::wstring dir = dictionary_directory();
+    if (dir.empty()) {
         return;
     }
 
-    std::wstring dir = path;
-    const auto slash = dir.find_last_of(L"\\/");
-    if (slash == std::wstring::npos) {
-        return;
-    }
-    dir.resize(slash);
-
-    const bool en = g_en_index.load_utf8_file(dir + L"\\dict\\en.txt");
-    const bool ru = g_ru_index.load_utf8_file(dir + L"\\dict\\ru.txt");
+    const wchar_t sep = path_separator();
+    const bool en = g_en_index.load_utf8_file(dir + sep + L"en.txt");
+    const bool ru = g_ru_index.load_utf8_file(dir + sep + L"ru.txt");
     if (en || ru) {
         g_en_index.finalize();
         g_ru_index.finalize();

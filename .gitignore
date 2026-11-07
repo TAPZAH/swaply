@@ -7,3 +7,4 @@ CMakeUserPresets.json
 *.aps
 *.sdf
 *.opensdf
+build-*/

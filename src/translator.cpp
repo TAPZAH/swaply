@@ -5,8 +5,21 @@
 
 namespace {
 
+constexpr unsigned int kVkOemMinus = 0xBD;
+constexpr unsigned int kVkOemPlus = 0xBB;
+constexpr unsigned int kVkOem4 = 0xDB;
+constexpr unsigned int kVkOem6 = 0xDD;
+constexpr unsigned int kVkOem1 = 0xBA;
+constexpr unsigned int kVkOem7 = 0xDE;
+constexpr unsigned int kVkOemComma = 0xBC;
+constexpr unsigned int kVkOemPeriod = 0xBE;
+constexpr unsigned int kVkOem2 = 0xBF;
+constexpr unsigned int kVkOem5 = 0xDC;
+constexpr unsigned int kVkOem3 = 0xC0;
+constexpr unsigned int kVkNumpad0 = 0x60;
+
 struct KeyGlyphs {
-    UINT vk;
+    unsigned int vk;
     wchar_t en;
     wchar_t en_shift;
     wchar_t ru;
@@ -15,7 +28,7 @@ struct KeyGlyphs {
 };
 
 constexpr std::array<KeyGlyphs, 47> kKeys{{
-    {VK_OEM_3, L'`', L'~', L'ё', L'Ё', true},
+    {kVkOem3, L'`', L'~', L'ё', L'Ё', true},
     {'1', L'1', L'!', L'1', L'!', false},
     {'2', L'2', L'@', L'2', L'"', false},
     {'3', L'3', L'#', L'3', L'№', false},
@@ -26,8 +39,8 @@ constexpr std::array<KeyGlyphs, 47> kKeys{{
     {'8', L'8', L'*', L'8', L'*', false},
     {'9', L'9', L'(', L'9', L'(', false},
     {'0', L'0', L')', L'0', L')', false},
-    {VK_OEM_MINUS, L'-', L'_', L'-', L'_', false},
-    {VK_OEM_PLUS, L'=', L'+', L'=', L'+', false},
+    {kVkOemMinus, L'-', L'_', L'-', L'_', false},
+    {kVkOemPlus, L'=', L'+', L'=', L'+', false},
 
     {'Q', L'q', L'Q', L'й', L'Й', true},
     {'W', L'w', L'W', L'ц', L'Ц', true},
@@ -39,8 +52,8 @@ constexpr std::array<KeyGlyphs, 47> kKeys{{
     {'I', L'i', L'I', L'ш', L'Ш', true},
     {'O', L'o', L'O', L'щ', L'Щ', true},
     {'P', L'p', L'P', L'з', L'З', true},
-    {VK_OEM_4, L'[', L'{', L'х', L'Х', true},
-    {VK_OEM_6, L']', L'}', L'ъ', L'Ъ', true},
+    {kVkOem4, L'[', L'{', L'х', L'Х', true},
+    {kVkOem6, L']', L'}', L'ъ', L'Ъ', true},
 
     {'A', L'a', L'A', L'ф', L'Ф', true},
     {'S', L's', L'S', L'ы', L'Ы', true},
@@ -51,8 +64,8 @@ constexpr std::array<KeyGlyphs, 47> kKeys{{
     {'J', L'j', L'J', L'о', L'О', true},
     {'K', L'k', L'K', L'л', L'Л', true},
     {'L', L'l', L'L', L'д', L'Д', true},
-    {VK_OEM_1, L';', L':', L'ж', L'Ж', true},
-    {VK_OEM_7, L'\'', L'"', L'э', L'Э', true},
+    {kVkOem1, L';', L':', L'ж', L'Ж', true},
+    {kVkOem7, L'\'', L'"', L'э', L'Э', true},
 
     {'Z', L'z', L'Z', L'я', L'Я', true},
     {'X', L'x', L'X', L'ч', L'Ч', true},
@@ -61,13 +74,13 @@ constexpr std::array<KeyGlyphs, 47> kKeys{{
     {'B', L'b', L'B', L'и', L'И', true},
     {'N', L'n', L'N', L'т', L'Т', true},
     {'M', L'm', L'M', L'ь', L'Ь', true},
-    {VK_OEM_COMMA, L',', L'<', L'б', L'Б', true},
-    {VK_OEM_PERIOD, L'.', L'>', L'ю', L'Ю', true},
-    {VK_OEM_2, L'/', L'?', L'.', L',', false},
-    {VK_OEM_5, L'\\', L'|', L'\\', L'/', false},
+    {kVkOemComma, L',', L'<', L'б', L'Б', true},
+    {kVkOemPeriod, L'.', L'>', L'ю', L'Ю', true},
+    {kVkOem2, L'/', L'?', L'.', L',', false},
+    {kVkOem5, L'\\', L'|', L'\\', L'/', false},
 }};
 
-[[nodiscard]] const KeyGlyphs* find_vk(UINT vk) noexcept {
+[[nodiscard]] const KeyGlyphs* find_vk(unsigned int vk) noexcept {
     for (const auto& key : kKeys) {
         if (key.vk == vk) {
             return &key;
@@ -119,6 +132,7 @@ constexpr std::array<KeyGlyphs, 47> kKeys{{
 
 }  // namespace
 
+#ifdef _WIN32
 Translator::Layout Translator::detect_layout(HKL hkl) noexcept {
     switch (PRIMARYLANGID(LOWORD(reinterpret_cast<ULONG_PTR>(hkl)))) {
     case LANG_ENGLISH:
@@ -129,6 +143,7 @@ Translator::Layout Translator::detect_layout(HKL hkl) noexcept {
         return Layout::Other;
     }
 }
+#endif
 
 Translator::Layout Translator::infer_layout(std::wstring_view text) noexcept {
     int latin = 0;
@@ -179,14 +194,18 @@ std::optional<Translator::PhysicalKey> Translator::key_from_char(wchar_t ch, Lay
     return std::nullopt;
 }
 
-std::optional<wchar_t> Translator::char_from_vk(UINT vk, bool shift, bool caps, Layout layout) noexcept {
+std::optional<wchar_t> Translator::char_from_vk(
+    unsigned int vk,
+    bool shift,
+    bool caps,
+    Layout layout) noexcept {
     if (layout == Layout::Other) {
         layout = Layout::En;
     }
 
-    UINT normalized = vk;
-    if (vk >= VK_NUMPAD0 && vk <= VK_NUMPAD9) {
-        normalized = static_cast<UINT>('0' + (vk - VK_NUMPAD0));
+    unsigned int normalized = vk;
+    if (vk >= kVkNumpad0 && vk <= kVkNumpad0 + 9) {
+        normalized = static_cast<unsigned int>('0' + (vk - kVkNumpad0));
     }
 
     const KeyGlyphs* key = find_vk(normalized);

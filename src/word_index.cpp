@@ -1,8 +1,14 @@
 #include "word_index.h"
 
-#include <Windows.h>
+#include "utf8.h"
 
 #include <algorithm>
+#include <fstream>
+#include <iterator>
+
+#ifdef _WIN32
+#include <Windows.h>
+#endif
 
 void WordIndex::add(std::wstring word) {
     if (!word.empty()) {
@@ -19,6 +25,9 @@ void WordIndex::finalize() {
 }
 
 bool WordIndex::load_utf8_file(const std::wstring& path) {
+    std::string text;
+
+#ifdef _WIN32
     HANDLE file = CreateFileW(path.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
     if (file == INVALID_HANDLE_VALUE) {
         return false;
@@ -30,7 +39,7 @@ bool WordIndex::load_utf8_file(const std::wstring& path) {
         return false;
     }
 
-    std::string text(static_cast<std::size_t>(size.QuadPart), '\0');
+    text.resize(static_cast<std::size_t>(size.QuadPart));
     DWORD read = 0;
     const BOOL ok = ReadFile(file, text.data(), static_cast<DWORD>(text.size()), &read, nullptr);
     CloseHandle(file);
@@ -38,38 +47,44 @@ bool WordIndex::load_utf8_file(const std::wstring& path) {
         return false;
     }
     text.resize(read);
+#else
+    std::ifstream input(wide_to_utf8(path), std::ios::binary);
+    if (!input) {
+        return false;
+    }
+    text.assign(std::istreambuf_iterator<char>(input), std::istreambuf_iterator<char>());
+    if (text.size() > 8 * 1024 * 1024) {
+        return false;
+    }
+#endif
 
     std::string current;
     const auto flush = [&]() {
         if (current.empty()) {
             return;
         }
-        const int needed = MultiByteToWideChar(CP_UTF8, 0, current.data(), static_cast<int>(current.size()), nullptr, 0);
-        if (needed > 0) {
-            std::wstring wide(static_cast<std::size_t>(needed), L'\0');
-            MultiByteToWideChar(CP_UTF8, 0, current.data(), static_cast<int>(current.size()), wide.data(), needed);
-            std::wstring core;
-            core.reserve(wide.size());
-            for (wchar_t ch : wide) {
-                if (ch >= L'A' && ch <= L'Z') {
-                    ch = static_cast<wchar_t>(ch - L'A' + L'a');
-                } else if (ch >= L'А' && ch <= L'Я') {
-                    ch = static_cast<wchar_t>(ch - L'А' + L'а');
-                } else if (ch == L'Ё' || ch == L'ё') {
-                    ch = L'е';
-                }
-                const bool letter = (ch >= L'a' && ch <= L'z') || (ch >= L'а' && ch <= L'я');
-                if (letter) {
-                    core.push_back(ch);
-                }
+        const std::wstring wide = utf8_to_wide(current);
+        std::wstring core;
+        core.reserve(wide.size());
+        for (wchar_t ch : wide) {
+            if (ch >= L'A' && ch <= L'Z') {
+                ch = static_cast<wchar_t>(ch - L'A' + L'a');
+            } else if (ch >= L'А' && ch <= L'Я') {
+                ch = static_cast<wchar_t>(ch - L'А' + L'а');
+            } else if (ch == L'Ё' || ch == L'ё') {
+                ch = L'е';
             }
-            // Frequency lists carry lots of noise made of one/two letters
-            // ("lf", "vs", "ab", ...). Those junk entries make short Latin
-            // strings look like known words and block conversions. Real short
-            // words live in the curated short lists, so ignore them here.
-            if (core.size() >= 3) {
-                add(std::move(core));
+            const bool letter = (ch >= L'a' && ch <= L'z') || (ch >= L'а' && ch <= L'я');
+            if (letter) {
+                core.push_back(ch);
             }
+        }
+        // Frequency lists carry lots of noise made of one/two letters
+        // ("lf", "vs", "ab", ...). Those junk entries make short Latin
+        // strings look like known words and block conversions. Real short
+        // words live in the curated short lists, so ignore them here.
+        if (core.size() >= 3) {
+            add(std::move(core));
         }
         current.clear();
     };

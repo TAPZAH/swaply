@@ -26,6 +26,12 @@ install -m 0644 "${SOURCE_DIR}/assets/dict/en.txt" "${PKG}/usr/share/swaply/dict
 install -m 0644 "${SOURCE_DIR}/assets/dict/ru.txt" "${PKG}/usr/share/swaply/dict/ru.txt"
 install -m 0644 "${SOURCE_DIR}/assets/dict/ATTRIBUTION.txt" "${PKG}/usr/share/swaply/dict/ATTRIBUTION.txt"
 install -m 0644 "${SOURCE_DIR}/assets/default_config.json" "${PKG}/usr/share/swaply/default_config.json"
+install -m 0644 "${SOURCE_DIR}/assets/icon.png" "${PKG}/usr/share/swaply/icon.png"
+for SZ in 16 24 32 48 64 128 256; do
+    install -d "${PKG}/usr/share/icons/hicolor/${SZ}x${SZ}/apps"
+    install -m 0644 "${SOURCE_DIR}/assets/linux/icons/${SZ}x${SZ}/swaply.png" \
+        "${PKG}/usr/share/icons/hicolor/${SZ}x${SZ}/apps/swaply.png"
+done
 install -m 0644 "${SOURCE_DIR}/LICENSE" "${PKG}/usr/share/doc/swaply/copyright"
 install -m 0644 "${SOURCE_DIR}/THIRD_PARTY.md" "${PKG}/usr/share/doc/swaply/THIRD_PARTY.md"
 
@@ -35,7 +41,7 @@ Type=Application
 Name=Swaply
 Comment=EN/RU keyboard layout switcher
 Exec=swaply-tray
-Icon=input-keyboard
+Icon=swaply
 Terminal=false
 Categories=Utility;
 Keywords=keyboard;layout;switcher;

@@ -219,7 +219,12 @@ int main(int argc, char** argv) {
     gtk_widget_show_all(g_menu);
     refresh_menu_state();
 
-    GtkStatusIcon* icon = gtk_status_icon_new_from_icon_name("input-keyboard");
+    // Prefer the themed application icon ("swaply", installed with the deb into
+    // hicolor); fall back to a generic keyboard icon when running from a build
+    // tree where the icon is not registered with the desktop theme.
+    const char* icon_name =
+        gtk_icon_theme_has_icon(gtk_icon_theme_get_default(), "swaply") ? "swaply" : "input-keyboard";
+    GtkStatusIcon* icon = gtk_status_icon_new_from_icon_name(icon_name);
     gtk_status_icon_set_tooltip_text(icon, "Swaply — EN/RU");
     gtk_status_icon_set_visible(icon, TRUE);
     g_signal_connect(icon, "popup-menu", G_CALLBACK(on_popup_menu), nullptr);

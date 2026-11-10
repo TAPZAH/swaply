@@ -176,5 +176,9 @@ include(GNUInstallDirs)
 install(TARGETS swaply-x11 swaply-tray RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 install(DIRECTORY assets/dict DESTINATION ${CMAKE_INSTALL_DATADIR}/swaply)
 install(FILES assets/default_config.json DESTINATION ${CMAKE_INSTALL_DATADIR}/swaply)
+install(FILES assets/icon.png DESTINATION ${CMAKE_INSTALL_DATADIR}/swaply)
+install(DIRECTORY assets/linux/icons/
+    DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor
+    FILES_MATCHING PATTERN "swaply.png")
 
 endif()

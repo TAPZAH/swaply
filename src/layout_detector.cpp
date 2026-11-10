@@ -694,7 +694,20 @@ void ensure_indexes() {
 // Russian letters that live on punctuation keys appear in the English layout as
 // ; : [ ] { } < > ` ~ . Seeing one inside a Latin token is a strong sign the text
 // was typed in the wrong layout (e.g. ":jubyf" -> "Жогина", "j,]trn" -> "объект").
+// The comma/period/apostrophe (б/ю/э) are ignored in the middle/end because they
+// are common English punctuation, but a correct English token never STARTS with
+// them, so a leading one is an unambiguous wrong-layout signal (",hennj" -> "брутто").
 [[nodiscard]] bool has_russian_key_symbol(std::wstring_view text) noexcept {
+    if (!text.empty()) {
+        switch (text.front()) {
+        case L',':
+        case L'.':
+        case L'\'':
+            return true;
+        default:
+            break;
+        }
+    }
     for (const wchar_t ch : text) {
         switch (ch) {
         case L';':
@@ -1068,19 +1081,19 @@ namespace {
         return false;
     }
     if (converted_known) {
-    // Symmetric guard for two-letter targets only: do not switch into a short
-    // term while the typed text is still an in-progress word of its own
-    // language. Three-letter targets are not guarded: almost any Latin trigram
-    // is a prefix of some rare word ("ult" -> "ultimate", "nen" -> "nene"),
-    // which blocked frequent Russian words such as "где" and "тут". Very common
-    // two-letter Russian words (из, вы, да, ...) are exempt for the same reason.
-    const bool allow_common_short =
-        typed_core.size() == 2 && target == Translator::Layout::Ru &&
-        is_common_short_russian(converted_core);
-    if (!allow_common_short && converted_core.size() <= 2 &&
-        dictionary_has_prefix(typed_core, source)) {
-        return false;
-    }
+        // Symmetric guard for two-letter targets only: do not switch into a short
+        // term while the typed text is still an in-progress word of its own
+        // language. Three-letter targets are not guarded: almost any Latin trigram
+        // is a prefix of some rare word ("ult" -> "ultimate", "nen" -> "nene"),
+        // which blocked frequent Russian words such as "где" and "тут". Very common
+        // two-letter Russian words (из, вы, да, ...) are exempt for the same reason.
+        const bool allow_common_short =
+            typed_core.size() == 2 && target == Translator::Layout::Ru &&
+            is_common_short_russian(converted_core);
+        if (!allow_common_short && converted_core.size() <= 2 &&
+            dictionary_has_prefix(typed_core, source)) {
+            return false;
+        }
         return true;
     }
 

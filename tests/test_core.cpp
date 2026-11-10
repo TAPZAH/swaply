@@ -234,6 +234,11 @@ int main() {
     expect(LayoutDetector::should_switch(L"bp", L"из", Translator::Layout::En), "dl_should_iz");
     expect(LayoutDetector::should_switch(L"ds", L"вы", Translator::Layout::En), "dl_should_vy");
     expect(LayoutDetector::should_switch(L"ult", L"где", Translator::Layout::En), "dl_should_gde");
+    // Leading punctuation key that is a Russian letter (б/ю/э) must count.
+    expect(Translator::convert(L",hennj") == L"брутто", "dl_convert_brutto");
+    expect(LayoutDetector::should_switch(L",hennj", L"брутто", Translator::Layout::En), "dl_should_brutto");
+    expect(Translator::convert(L".hbcn") == L"юрист", "dl_convert_yurist");
+    expect(LayoutDetector::should_switch(L".hbcn", L"юрист", Translator::Layout::En), "dl_should_yurist");
     expect(LayoutDetector::should_switch(L"nen", L"тут", Translator::Layout::En), "dl_should_tut");
     expect(LayoutDetector::should_switch(L"ble", L"иду", Translator::Layout::En), "dl_should_idu");
     expect(LayoutDetector::should_switch(L"nf", L"та", Translator::Layout::En), "dl_should_ta");

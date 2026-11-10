@@ -287,7 +287,16 @@ void append_utf8(std::string& out, unsigned code) {
     if (pos >= body.size() || body[pos] != '"') {
         return {};
     }
-    return json_unescape(body, pos + 1);
+    std::string result = json_unescape(body, pos + 1);
+    // GitHub keeps the release body verbatim; a UTF-8 BOM from the notes file
+    // would otherwise show up as a stray character at the start of the dialog.
+    if (result.size() >= 3 &&
+        static_cast<unsigned char>(result[0]) == 0xEF &&
+        static_cast<unsigned char>(result[1]) == 0xBB &&
+        static_cast<unsigned char>(result[2]) == 0xBF) {
+        result.erase(0, 3);
+    }
+    return result;
 }
 
 [[nodiscard]] std::array<int, 3> parse_version(std::wstring_view text) {

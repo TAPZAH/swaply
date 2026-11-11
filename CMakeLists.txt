@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.16)
 
-project(Swaply VERSION 0.992.0 LANGUAGES CXX)
+project(Swaply VERSION 0.992.2 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -128,6 +128,9 @@ if(NOT X11_Xtst_FOUND)
     message(FATAL_ERROR "libXtst is required for XRecord/XTest")
 endif()
 
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(GIO REQUIRED gio-2.0)
+
 add_executable(swaply-x11
     src/linux/main_x11.cpp
     src/linux/config_linux.cpp
@@ -141,16 +144,17 @@ target_include_directories(swaply-x11 PRIVATE
     src
     ${X11_INCLUDE_DIR}
     ${X11_Xtst_INCLUDE_PATH}
+    ${GIO_INCLUDE_DIRS}
 )
 
 target_link_libraries(swaply-x11 PRIVATE
     ${X11_LIBRARIES}
     ${X11_Xtst_LIB}
+    ${GIO_LINK_LIBRARIES}
 )
 
 target_compile_options(swaply-x11 PRIVATE -Wall -Wextra -Wpedantic)
 
-find_package(PkgConfig REQUIRED)
 pkg_check_modules(GTK3 REQUIRED gtk+-3.0)
 
 add_executable(swaply-tray

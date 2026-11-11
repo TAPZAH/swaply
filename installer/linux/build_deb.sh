@@ -6,11 +6,14 @@ set -eu
 BUILD_DIR="${1:-/tmp/build}"
 SOURCE_DIR="${2:-/src}"
 OUT_DIR="${3:-${SOURCE_DIR}/dist}"
-VERSION="${4:-0.991~beta}"
+VERSION="${4:-0.992.2~beta}"
 ARCH="${5:-amd64}"
 
-PKG="${BUILD_DIR}/deb-root"
-rm -rf "${PKG}"
+# Build the package tree under a POSIX temp dir: dpkg-deb inspects directory
+# modes and workspaces on FAT/exFAT-mounted drives report 0777 regardless of
+# chmod.  The tree is disposable, so its location does not matter.
+PKG="$(mktemp -d "${TMPDIR:-/tmp}/swaply-deb-XXXXXX")"
+trap 'rm -rf "${PKG}"' EXIT
 mkdir -p "${PKG}/DEBIAN" \
          "${PKG}/usr/bin" \
          "${PKG}/usr/share/swaply/dict" \
@@ -56,11 +59,19 @@ Priority: optional
 Architecture: ${ARCH}
 Installed-Size: ${SIZE}
 Maintainer: Tap3ah
-Depends: libx11-6, libxtst6, libgtk-3-0 | libgtk-3-0t64, libstdc++6
+Depends: libx11-6, libxtst6, libgtk-3-0 | libgtk-3-0t64, libglib2.0-0 | libglib2.0-0t64, libstdc++6
 Description: EN/RU keyboard layout switcher for X11
  Swaply watches typing, detects words typed in the wrong EN/RU layout
  and retypes them, switching the XKB group. It runs as a tray daemon.
 EOF
+
+# dpkg-deb refuses (or mispackages) directories that are group/world writable;
+# it checks the source tree before packaging, so normalize every mode here.
+# Some umasks (FAT-backed workspaces) create 0777 dirs and files.
+chmod -R a-w "${PKG}" 2>/dev/null || true
+find "${PKG}" -type d -exec chmod 0755 {} +
+find "${PKG}" -type f -exec chmod 0644 {} +
+find "${PKG}/usr/bin" -type f -exec chmod 0755 {} +
 
 mkdir -p "${OUT_DIR}"
 dpkg-deb --build --root-owner-group "${PKG}" "${OUT_DIR}/swaply_${VERSION}_${ARCH}.deb"

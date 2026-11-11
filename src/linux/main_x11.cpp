@@ -15,6 +15,8 @@
 #include <X11/extensions/record.h>
 #include <X11/keysym.h>
 
+#include <gio/gio.h>
+
 #include <atomic>
 #include <cctype>
 #include <chrono>
@@ -25,6 +27,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iterator>
+#include <map>
 #include <mutex>
 #include <optional>
 #include <set>
@@ -111,6 +114,47 @@ struct Hotkey {
     if (sym >= 0xA0 && sym <= 0xFF) {
         return static_cast<unsigned>(sym);
     }
+    // Legacy Cyrillic keysyms (0x06c0–0x06ff) used by xkeyboard-config for the
+    // `ru` layout are not in Unicode order: 0x06c1=а, 0x06c6=ф and so on.
+    if (sym >= 0x06C0 && sym <= 0x06FF) {
+        static const unsigned short kCyrillicLower[32] = {
+            0x044E,  // ю
+            0x0430,  // а
+            0x0431,  // б
+            0x0446,  // ц
+            0x0434,  // д
+            0x0435,  // е
+            0x0444,  // ф
+            0x0433,  // г
+            0x0445,  // х
+            0x0438,  // и
+            0x0439,  // й
+            0x043A,  // к
+            0x043B,  // л
+            0x043C,  // м
+            0x043D,  // н
+            0x043E,  // о
+            0x043F,  // п
+            0x044F,  // я
+            0x0440,  // р
+            0x0441,  // с
+            0x0442,  // т
+            0x0443,  // у
+            0x0436,  // ж
+            0x0432,  // в
+            0x044C,  // ь
+            0x044B,  // ы
+            0x0437,  // з
+            0x0448,  // ш
+            0x044D,  // э
+            0x0449,  // щ
+            0x0447,  // ч
+            0x044A,  // ъ
+        };
+        const unsigned index = static_cast<unsigned>(sym - 0x06C0) & 31u;
+        const unsigned code = kCyrillicLower[index];
+        return (sym >= 0x06E0) ? code - 0x20u : code;
+    }
     return 0;
 }
 
@@ -147,6 +191,8 @@ struct Glyph {
     bool shift = false;
     wchar_t ch = 0;
     wchar_t alt = 0;
+    int group = -1;
+    bool caps = false;
 };
 
 struct PendingConvert {
@@ -205,6 +251,64 @@ public:
 
     [[nodiscard]] bool ready() const noexcept { return en_group_ >= 0 && ru_group_ >= 0; }
 
+    // Cinnamon (and GNOME) revert XkbLockGroup performed by foreign clients: the
+    // shell keeps its own notion of the current input source and re-locks the
+    // group whenever an external change is detected.  When the shell exposes
+    // org.Cinnamon we switch layouts through its D-Bus API instead, so the
+    // change is accepted (and the panel indicator follows along).
+    void init_session_activator() {
+        bus_ = g_bus_get_sync(G_BUS_TYPE_SESSION, nullptr, nullptr);
+        if (bus_ == nullptr) {
+            return;
+        }
+        GError* error = nullptr;
+        GVariant* reply = g_dbus_connection_call_sync(
+            bus_, "org.Cinnamon", "/org/Cinnamon", "org.Cinnamon", "GetInputSources",
+            nullptr, G_VARIANT_TYPE("(a(ssisssssssib))"),
+            G_DBUS_CALL_FLAGS_NONE, 500, nullptr, &error);
+        if (error != nullptr) {
+            g_error_free(error);
+            return;
+        }
+        GVariant* list = g_variant_get_child_value(reply, 0);
+        const gsize count = g_variant_n_children(list);
+        for (gsize i = 0; i < count; ++i) {
+            GVariant* item = g_variant_get_child_value(list, i);
+            gchar* backend = nullptr;
+            gchar* id = nullptr;
+            gint index = -1;
+            g_variant_get_child(item, 0, "s", &backend);
+            g_variant_get_child(item, 1, "s", &id);
+            g_variant_get_child(item, 2, "i", &index);
+            if (std::strcmp(backend, "xkb") == 0 && index >= 0 && index < 4) {
+                xkb_source_ids_[index] = id;
+            }
+            g_free(backend);
+            g_free(id);
+            g_variant_unref(item);
+        }
+        g_variant_unref(list);
+        g_variant_unref(reply);
+    }
+
+    // Called after detect_layouts(): use the D-Bus path only when the shell's
+    // source ordering matches the XKB groups we probed.
+    void enable_session_activator() {
+        const auto en = xkb_source_ids_.find(en_group_);
+        const auto ru = xkb_source_ids_.find(ru_group_);
+        if (en == xkb_source_ids_.end() || ru == xkb_source_ids_.end()) {
+            return;
+        }
+        const std::string& en_id = en->second;
+        const std::string& ru_id = ru->second;
+        const bool en_ok = en_id.rfind("us", 0) == 0 || en_id.rfind("en", 0) == 0 || en_id.rfind("gb", 0) == 0;
+        const bool ru_ok = ru_id.rfind("ru", 0) == 0;
+        use_cinnamon_ = en_ok && ru_ok;
+        if (use_cinnamon_) {
+            std::fprintf(stderr, "Swaply: Cinnamon shell detected, switching via D-Bus\n");
+        }
+    }
+
     void set_context(XRecordContext context) noexcept { context_ = context; }
 
     void apply_config(const LinuxConfig& config) {
@@ -217,16 +321,6 @@ public:
     }
 
     void handle_key(KeyCode keycode, unsigned int state, bool pressed) {
-        if (wait_release_) {
-            if (!pressed && keycode == wait_release_key_) {
-                wait_release_ = false;
-                wait_release_key_ = 0;
-                if (context_ != 0) {
-                    XRecordDisableContext(display_, context_);
-                }
-            }
-            return;
-        }
         if (!pressed) {
             return;
         }
@@ -280,7 +374,25 @@ public:
         }
         const wchar_t alt_char = char_for(keycode, opposite_group(group), shift, caps);
         if (word_.size() < 128) {
-            word_.push_back(Glyph{keycode, shift, ch, alt_char});
+            word_.push_back(Glyph{keycode, shift, ch, alt_char, group, caps});
+        }
+    }
+
+    void lock_group(int group) {
+        // Lock the XKB group immediately: this is a single server request, so
+        // the whole retype pipeline stays within ~1 ms and cannot interleave
+        // with fast typing in the middle of the next word.
+        XkbLockGroup(display_, XkbUseCoreKbd, static_cast<unsigned>(group));
+        if (use_cinnamon_) {
+            // Tell the shell to adopt the group so that its layout keeper does
+            // not revert it.  Fire-and-forget: waiting for the D-Bus reply (or
+            // polling the group) would stall the retype for tens of ms and
+            // corrupt words typed during the stall.  The shell's revert (if it
+            // races) is overwritten by this activation a few ms later.
+            g_dbus_connection_call(
+                bus_, "org.Cinnamon", "/org/Cinnamon", "org.Cinnamon",
+                "ActivateInputSourceIndex", g_variant_new("(i)", group),
+                nullptr, G_DBUS_CALL_FLAGS_NONE, -1, nullptr, nullptr, nullptr);
         }
     }
 
@@ -291,13 +403,22 @@ public:
         const PendingConvert pending = std::move(*pending_);
         pending_.reset();
 
+        // The user is usually still holding the terminator key (space, Enter).
+        // The X server suppresses a KeyPress for a key it considers already
+        // down, so release the logical state first; the fake press then reaches
+        // the application and the pending physical release becomes a no-op.
+        // Queried upfront so the whole conversion below is one uninterrupted
+        // request burst: no hardware key can be processed in the middle of it.
+        if (pending.terminator != 0) {
+            release_if_down(pending.terminator);
+        }
+
         const std::size_t deletes = pending.glyphs.size() + (pending.terminator != 0 ? 1 : 0);
         for (std::size_t i = 0; i < deletes; ++i) {
             tap(backspace_key_, false);
         }
 
-        XkbLockGroup(display_, XkbUseCoreKbd, static_cast<unsigned int>(pending.target_group));
-        XFlush(display_);
+        lock_group(pending.target_group);
 
         for (const Glyph& glyph : pending.glyphs) {
             tap(glyph.keycode, glyph.shift);
@@ -305,12 +426,27 @@ public:
         if (pending.terminator != 0) {
             tap(pending.terminator, pending.terminator_shift);
         }
-        XFlush(display_);
+        // The context is disabled, but the fake events travel on the control
+        // connection while the next XRecordEnableContext goes on the data
+        // connection.  XSync flushes the burst and makes sure the server has
+        // processed every fake event before recording is switched back on,
+        // so the daemon never sees (or deletes) its own keystrokes.
+        XSync(display_, False);
     }
 
 private:
     [[nodiscard]] int opposite_group(int group) const noexcept {
         return group == ru_group_ ? en_group_ : ru_group_;
+    }
+
+    [[nodiscard]] Translator::Layout layout_of(int group, const std::wstring& typed) const {
+        if (group == ru_group_) {
+            return Translator::Layout::Ru;
+        }
+        if (group == en_group_) {
+            return Translator::Layout::En;
+        }
+        return Translator::infer_layout(typed);
     }
 
     [[nodiscard]] wchar_t char_for(KeyCode keycode, int group, bool shift, bool caps) const noexcept {
@@ -351,6 +487,21 @@ private:
         }
     }
 
+    // Reading of the whole keystroke stream as if every key had been typed
+    // in the given group.
+    [[nodiscard]] std::wstring stream_reading(const std::vector<Glyph>& glyphs, int group) const {
+        std::wstring reading;
+        reading.reserve(glyphs.size());
+        for (const Glyph& glyph : glyphs) {
+            wchar_t ch = char_for(glyph.keycode, group, glyph.shift, glyph.caps);
+            if (ch == 0) {
+                ch = glyph.ch;  // unmapped in that group: keep as typed
+            }
+            reading.push_back(ch);
+        }
+        return reading;
+    }
+
     void convert_current(KeyCode terminator, bool terminator_shift, int group) {
         if (word_.empty() || !ready()) {
             word_.clear();
@@ -366,32 +517,61 @@ private:
             converted.push_back(glyph.alt);
         }
 
-        Translator::Layout source = Translator::Layout::En;
-        if (group == ru_group_) {
-            source = Translator::Layout::Ru;
-        } else if (group != en_group_) {
-            source = Translator::infer_layout(typed);
+        // Normal case: the word was typed in one layout — try its opposite.
+        // Mixed case: the user switched layout in the middle of the word (a
+        // hybrid like "gj" + "дними"). Then re-reading the whole keystroke
+        // stream in the current layout usually restores the intended word,
+        // so that reading is tried first (target = same layout, only the text
+        // is retyped), and the opposite one second.
+        struct Candidate {
+            std::wstring reading;
+            int target_group = -1;
+            Translator::Layout source = Translator::Layout::En;
+        };
+        std::vector<Candidate> candidates;
+        int last_group = group;
+        for (const Glyph& glyph : word_) {
+            if (glyph.group >= 0) {
+                last_group = glyph.group;
+            }
+        }
+        const int primary = (last_group == en_group_ || last_group == ru_group_)
+                                ? opposite_group(last_group)
+                                : ru_group_;
+        candidates.push_back(Candidate{converted, primary, layout_of(last_group, typed)});
+        if (last_group == en_group_ || last_group == ru_group_) {
+            const std::wstring same_group_reading = stream_reading(word_, last_group);
+            if (same_group_reading != typed) {
+                candidates.push_back(
+                    Candidate{same_group_reading, last_group, Translator::opposite(layout_of(last_group, typed))});
+            }
         }
 
-        if (!LayoutDetector::should_switch(typed, converted, source, config_.min_word_length)) {
+        for (const Candidate& candidate : candidates) {
+            if (candidate.target_group < 0 || candidate.reading == typed) {
+                continue;
+            }
+            if (!LayoutDetector::should_switch(
+                    typed, candidate.reading, candidate.source, config_.min_word_length)) {
+                continue;
+            }
+            pending_ = PendingConvert{
+                word_,
+                terminator,
+                terminator_shift,
+                candidate.target_group,
+            };
             word_.clear();
+            if (context_ != 0) {
+                XRecordDisableContext(display_, context_);
+                // Must flush the control connection: XRecordEnableContext on the
+                // data connection blocks until the server sees the disable, and
+                // nothing else will ever flush this connection in the meantime.
+                XFlush(display_);
+            }
             return;
         }
-
-        pending_ = PendingConvert{
-            word_,
-            terminator,
-            terminator_shift,
-            (source == Translator::Layout::En) ? ru_group_ : en_group_,
-        };
         word_.clear();
-
-        if (terminator != 0) {
-            wait_release_ = true;
-            wait_release_key_ = terminator;
-        } else if (context_ != 0) {
-            XRecordDisableContext(display_, context_);
-        }
     }
 
     void tap(KeyCode keycode, bool shift) {
@@ -408,17 +588,27 @@ private:
         }
     }
 
+    void release_if_down(KeyCode keycode) {
+        unsigned char keys[32] = {};
+        XQueryKeymap(display_, reinterpret_cast<char*>(keys));
+        const bool down = (keys[keycode / 8] & (1u << (keycode % 8))) != 0;
+        if (down) {
+            XTestFakeKeyEvent(display_, keycode, False, CurrentTime);
+        }
+    }
+
     Display* display_ = nullptr;
     LinuxConfig config_;
     Hotkey hotkey_;
     mutable std::mutex mutex_;
     int en_group_ = -1;
     int ru_group_ = -1;
+    GDBusConnection* bus_ = nullptr;
+    bool use_cinnamon_ = false;
+    std::map<int, std::string> xkb_source_ids_;
     std::vector<Glyph> word_;
     std::optional<PendingConvert> pending_;
     XRecordContext context_ = 0;
-    bool wait_release_ = false;
-    KeyCode wait_release_key_ = 0;
 
     KeyCode backspace_key_ = 0;
     KeyCode return_key_ = 0;
@@ -429,7 +619,8 @@ private:
 };
 
 void record_callback(XPointer closure, XRecordInterceptData* data) {
-    if (data->category == XRecordFromServer && data->data != nullptr && data->data_len >= 32) {
+    // data_len is counted in 4-byte units; a core key event is 32 bytes = 8 units.
+    if (data->category == XRecordFromServer && data->data != nullptr && data->data_len >= 8) {
         const auto* raw = reinterpret_cast<const unsigned char*>(data->data);
         const int type = raw[0] & 0x7F;
         if (type == KeyPress || type == KeyRelease) {
@@ -521,6 +712,8 @@ int main() {
         std::fprintf(stderr, "Swaply: both EN and RU keyboard layouts must be present in the XKB group list\n");
         return 1;
     }
+    app.init_session_activator();
+    app.enable_session_activator();
     app.apply_config(config);
 
     XRecordRange* range = XRecordAllocRange();
